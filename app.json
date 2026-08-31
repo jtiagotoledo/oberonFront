@@ -21,7 +21,8 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.solardev.oberonFront",
-      "versionCode": 1
+      "versionCode": 1,
+      "softwareKeyboardLayoutMode": "resize" 
     },
     "web": {
       "output": "static",
