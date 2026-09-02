@@ -23,11 +23,7 @@ export default function LoginScreen() {
 
     try {
       const response = await api.post('/api/auth/login', { email, senha });
-      console.log(response, response);
-
       const { token, usuario } = response.data;
-      console.log('token,usuario', token, usuario);
-
 
       login(
         {
