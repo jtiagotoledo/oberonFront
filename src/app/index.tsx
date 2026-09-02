@@ -1,13 +1,60 @@
 import { useState } from 'react';
-import { Text, View, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, ScrollView } from 'react-native';
+import { Text, View, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { useAuthStore } from '../store/useAuthStore';
+import { api } from '../services/api';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    console.log('Tentando logar com:', email, senha);
+  const login = useAuthStore((state) => state.login);
+
+  const handleLogin = async () => {
+    if (!email || !senha) {
+      Alert.alert('Atenção', 'Preencha o e-mail e a senha.');
+      return;
+    }
+
+    Keyboard.dismiss();
+    setIsLoading(true);
+
+    try {
+      const response = await api.post('/api/auth/login', { email, senha });
+      console.log(response, response);
+
+      const { token, usuario } = response.data;
+      console.log('token,usuario', token, usuario);
+
+
+      login(
+        {
+          id: usuario.id,
+          name: usuario.nome,
+          email: usuario.email,
+          role: usuario.role
+        },
+        token
+      );
+
+      if (usuario.role === 'admin') {
+        router.replace('/(admin)/AdminScreen');
+      } else if (usuario.role === 'professor') {
+        router.replace('/(professor)/ProfessorScreen');
+      } else {
+        router.replace('/(aluno)/AlunoScreen');
+      }
+
+    } catch (error: any) {
+      console.log(error);
+      
+      const mensagemErro = error.response?.data?.erro || 'Não foi possível conectar ao servidor.';
+      Alert.alert('Erro ao entrar', mensagemErro);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -44,6 +91,7 @@ export default function LoginScreen() {
                 placeholderTextColor="#A0AEC0"
                 keyboardType="email-address"
                 autoCapitalize="none"
+                editable={!isLoading}
                 value={email}
                 onChangeText={setEmail}
               />
@@ -53,17 +101,23 @@ export default function LoginScreen() {
                 placeholder="Senha"
                 placeholderTextColor="#A0AEC0"
                 secureTextEntry
+                editable={!isLoading}
                 value={senha}
                 onChangeText={setSenha}
               />
 
               <TouchableOpacity
-                className="w-full bg-muv-verde rounded-md py-4 items-center active:opacity-80"
+                className={`w-full rounded-md py-4 items-center flex-row justify-center ${isLoading ? 'bg-muv-verde/70' : 'bg-muv-verde active:opacity-80'}`}
                 onPress={handleLogin}
+                disabled={isLoading}
               >
-                <Text className="text-white font-bold text-lg">
-                  Entrar
-                </Text>
+                {isLoading ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text className="text-white font-bold text-lg">
+                    Entrar
+                  </Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity className="mt-6 items-center">
