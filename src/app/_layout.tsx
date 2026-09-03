@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '../store/useAuthStore';
@@ -13,6 +13,7 @@ SplashScreen.preventAutoHideAsync();
 function NavigationGuard() {
   const router = useRouter();
   const segments = useSegments();
+  const pathname = usePathname();
   const { token, user, hasHydrated } = useAuthStore();
 
   useEffect(() => {
@@ -20,26 +21,27 @@ function NavigationGuard() {
 
     SplashScreen.hideAsync();
 
-    // segments[0] identifica o grupo atual: '(admin)', '(professor)', '(aluno)' ou undefined (raiz)
+    const rootSegment = (segments[0] as string) || '';
     const inAuthGroup =
-      segments[0] === '(admin)' ||
-      segments[0] === '(professor)' ||
-      segments[0] === '(aluno)';
+      rootSegment === '(admin)' ||
+      rootSegment === '(professor)' ||
+      rootSegment === '(aluno)' ||
+      pathname.includes('(admin)') ||
+      pathname.includes('(professor)') ||
+      pathname.includes('(aluno)');
 
     if (!token && inAuthGroup) {
-      // Sai do grupo protegido e força o retorno para a tela de Login
       router.replace('/');
     } else if (token && user && !inAuthGroup) {
-      // Se tiver token e estiver na tela de Login, manda para a área do perfil
       if (user.role === 'admin') {
         router.replace('/(admin)');
       } else if (user.role === 'professor') {
-        router.replace('/(professor)/ProfessorScreen');
+        router.replace('/(professor)');
       } else {
-        router.replace('/(aluno)/AlunoScreen');
+        router.replace('/(aluno)');
       }
     }
-  }, [token, user, hasHydrated, segments]);
+  }, [token, user, hasHydrated, segments, pathname]);
 
   return <Stack screenOptions={{ headerShown: false }} />;
 }

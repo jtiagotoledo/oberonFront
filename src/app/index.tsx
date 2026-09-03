@@ -40,9 +40,9 @@ export default function LoginScreen() {
       if (usuario.role === 'admin') {
         router.replace('/(admin)');
       } else if (usuario.role === 'professor') {
-        router.replace('/(professor)/ProfessorScreen');
+        router.replace('/(professor)');
       } else {
-        router.replace('/(aluno)/AlunoScreen');
+        router.replace('/(aluno)');
       }
     } catch (error: any) {
       console.log(error);
