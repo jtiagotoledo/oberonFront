@@ -1,13 +1,11 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useAuthStore } from '../../store/useAuthStore';
-import { router } from 'expo-router';
 
 export default function AdminScreen() {
   const { user, logout } = useAuthStore();
 
   const handleLogout = () => {
     logout();
-    router.replace('/');
   };
 
   return (

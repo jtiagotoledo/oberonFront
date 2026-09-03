@@ -1,17 +1,5 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  TouchableWithoutFeedback,
-  Keyboard,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import {  View,  Text,  TextInput,  TouchableOpacity,  KeyboardAvoidingView,  Platform,  TouchableWithoutFeedback,  Keyboard,  ScrollView,  Alert,  ActivityIndicator,} from 'react-native';
 import { api } from '../../services/api';
 
 export default function CadastrarAdminScreen() {
@@ -30,8 +18,7 @@ export default function CadastrarAdminScreen() {
     setIsLoading(true);
 
     try {
-      // Ajuste a rota de acordo com o seu adminRoutes.js no backend
-      await api.post('/api/admin/cadastrar', {
+      await api.post('/api/admins', {
         nome,
         email: email.trim().toLowerCase(),
         telefone,
@@ -73,7 +60,6 @@ export default function CadastrarAdminScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Card do Formulário */}
           <View className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <Text className="text-2xl font-bold text-gray-800 mb-2">
               Novo Administrador
@@ -82,14 +68,13 @@ export default function CadastrarAdminScreen() {
               O novo gestor terá acesso total aos cadastros, horários e relatórios do estúdio.
             </Text>
 
-            {/* Campo Nome */}
             <View className="mb-4">
               <Text className="text-sm font-semibold text-gray-700 mb-1.5">
                 Nome Completo
               </Text>
               <TextInput
                 className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base text-gray-800 bg-white focus:border-muv-verde"
-                placeholder="Ex: Carlos Eduardo"
+                placeholder="Ex: Maria Silva"
                 placeholderTextColor="#A0AEC0"
                 editable={!isLoading}
                 value={nome}
@@ -97,14 +82,13 @@ export default function CadastrarAdminScreen() {
               />
             </View>
 
-            {/* Campo E-mail */}
             <View className="mb-4">
               <Text className="text-sm font-semibold text-gray-700 mb-1.5">
                 E-mail
               </Text>
               <TextInput
                 className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base text-gray-800 bg-white focus:border-muv-verde"
-                placeholder="exemplo@oberonpilates.com"
+                placeholder="exemplo@muvup.com"
                 placeholderTextColor="#A0AEC0"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -114,7 +98,6 @@ export default function CadastrarAdminScreen() {
               />
             </View>
 
-            {/* Campo Telefone */}
             <View className="mb-6">
               <Text className="text-sm font-semibold text-gray-700 mb-1.5">
                 Telefone / WhatsApp
@@ -130,7 +113,6 @@ export default function CadastrarAdminScreen() {
               />
             </View>
 
-            {/* Botão de Ação */}
             <TouchableOpacity
               className={`w-full rounded-xl py-4 items-center justify-center flex-row shadow-sm ${
                 isLoading ? 'bg-muv-verde/70' : 'bg-muv-verde active:opacity-85'

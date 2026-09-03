@@ -18,26 +18,27 @@ function NavigationGuard() {
   useEffect(() => {
     if (!hasHydrated) return;
 
-    // Aguarda a árvore de navegação concluir o ciclo de montagem inicial
-    const timeout = setTimeout(() => {
-      SplashScreen.hideAsync();
+    SplashScreen.hideAsync();
 
-      const inAuthGroup = segments[0] === '(admin)' || segments[0] === '(professor)' || segments[0] === '(aluno)';
+    // segments[0] identifica o grupo atual: '(admin)', '(professor)', '(aluno)' ou undefined (raiz)
+    const inAuthGroup =
+      segments[0] === '(admin)' ||
+      segments[0] === '(professor)' ||
+      segments[0] === '(aluno)';
 
-      if (!token && inAuthGroup) {
-        router.replace('/');
-      } else if (token && user && !inAuthGroup) {
-        if (user.role === 'admin') {
-          router.replace('/(admin)');
-        } else if (user.role === 'professor') {
-          router.replace('/(professor)/ProfessorScreen');
-        } else {
-          router.replace('/(aluno)/AlunoScreen');
-        }
+    if (!token && inAuthGroup) {
+      // Sai do grupo protegido e força o retorno para a tela de Login
+      router.replace('/');
+    } else if (token && user && !inAuthGroup) {
+      // Se tiver token e estiver na tela de Login, manda para a área do perfil
+      if (user.role === 'admin') {
+        router.replace('/(admin)');
+      } else if (user.role === 'professor') {
+        router.replace('/(professor)/ProfessorScreen');
+      } else {
+        router.replace('/(aluno)/AlunoScreen');
       }
-    }, 0);
-
-    return () => clearTimeout(timeout);
+    }
   }, [token, user, hasHydrated, segments]);
 
   return <Stack screenOptions={{ headerShown: false }} />;

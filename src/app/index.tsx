@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { Text, View, TextInput, TouchableOpacity, Image, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
 import { api } from '../services/api';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [mostrarSenha, setMostrarSenha] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const login = useAuthStore((state) => state.login);
@@ -30,7 +32,7 @@ export default function LoginScreen() {
           id: usuario.id,
           name: usuario.nome,
           email: usuario.email,
-          role: usuario.role
+          role: usuario.role,
         },
         token
       );
@@ -42,11 +44,11 @@ export default function LoginScreen() {
       } else {
         router.replace('/(aluno)/AlunoScreen');
       }
-
     } catch (error: any) {
       console.log(error);
-      
-      const mensagemErro = error.response?.data?.erro || 'Não foi possível conectar ao servidor.';
+
+      const mensagemErro =
+        error.response?.data?.erro || 'Não foi possível conectar ao servidor.';
       Alert.alert('Erro ao entrar', mensagemErro);
     } finally {
       setIsLoading(false);
@@ -67,7 +69,6 @@ export default function LoginScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-
             <View className="items-center mb-8">
               <Image
                 source={require('../../assets/logo/logo.png')}
@@ -92,18 +93,33 @@ export default function LoginScreen() {
                 onChangeText={setEmail}
               />
 
-              <TextInput
-                className="w-full border border-gray-300 rounded-md px-4 py-3 mb-8 text-base text-gray-800 bg-white"
-                placeholder="Senha"
-                placeholderTextColor="#A0AEC0"
-                secureTextEntry
-                editable={!isLoading}
-                value={senha}
-                onChangeText={setSenha}
-              />
+              {/* Campo Senha com Botão de Revelar */}
+              <View className="w-full relative justify-center mb-8">
+                <TextInput
+                  className="w-full border border-gray-300 rounded-md pl-4 pr-12 py-3 text-base text-gray-800 bg-white"
+                  placeholder="Senha"
+                  placeholderTextColor="#A0AEC0"
+                  secureTextEntry={!mostrarSenha}
+                  editable={!isLoading}
+                  value={senha}
+                  onChangeText={setSenha}
+                />
+                <TouchableOpacity
+                  className="absolute right-3 p-1.5"
+                  onPress={() => setMostrarSenha((prev) => !prev)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={mostrarSenha ? 'eye-off-outline' : 'eye-outline'}
+                    size={22}
+                    color="#718096"
+                  />
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity
-                className={`w-full rounded-md py-4 items-center flex-row justify-center ${isLoading ? 'bg-muv-verde/70' : 'bg-muv-verde active:opacity-80'}`}
+                className={`w-full rounded-md py-4 items-center flex-row justify-center ${isLoading ? 'bg-muv-verde/70' : 'bg-muv-verde active:opacity-80'
+                  }`}
                 onPress={handleLogin}
                 disabled={isLoading}
               >
@@ -122,7 +138,6 @@ export default function LoginScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
-
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
