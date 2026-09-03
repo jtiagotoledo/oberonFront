@@ -28,7 +28,7 @@ function NavigationGuard() {
         router.replace('/');
       } else if (token && user && !inAuthGroup) {
         if (user.role === 'admin') {
-          router.replace('/(admin)/AdminScreen');
+          router.replace('/(admin)');
         } else if (user.role === 'professor') {
           router.replace('/(professor)/ProfessorScreen');
         } else {

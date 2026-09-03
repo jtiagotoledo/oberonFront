@@ -36,7 +36,7 @@ export default function LoginScreen() {
       );
 
       if (usuario.role === 'admin') {
-        router.replace('/(admin)/AdminScreen');
+        router.replace('/(admin)');
       } else if (usuario.role === 'professor') {
         router.replace('/(professor)/ProfessorScreen');
       } else {

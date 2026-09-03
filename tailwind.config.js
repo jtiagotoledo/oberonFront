@@ -6,10 +6,11 @@ module.exports = {
     extend: {
       colors: {
         muv: {
-          roxo: '#8B6AA6',
-          verde: '#6CB386',
-          laranja: '#F29C52',
-          teal: '#3BA896'
+          roxo: '#8C6E97',
+          verde: '#63B887',
+          laranja: '#E58B58',
+          amarelo:'#F3BF73',
+          teal: '#00A3A6'
         }
       }
     },

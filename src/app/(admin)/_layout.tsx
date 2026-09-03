@@ -7,12 +7,12 @@ export default function AdminLayout() {
       <Drawer
         screenOptions={{
           headerStyle: {
-            backgroundColor: '#2E7D32', // Cor muv-verde
+            backgroundColor: '#8C6E97', 
           },
           headerTintColor: '#ffffff',
           headerTitleAlign: 'center',
-          drawerActiveTintColor: '#2E7D32',
-          drawerInactiveTintColor: '#4A5568',
+          drawerActiveTintColor: '#63B887',
+          drawerInactiveTintColor: '#8C6E97',
           drawerLabelStyle: {
             fontSize: 15,
             fontWeight: '600',
