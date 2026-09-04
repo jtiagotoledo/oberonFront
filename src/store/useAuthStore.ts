@@ -7,6 +7,7 @@ interface User {
   name: string;
   email: string;
   role: 'admin' | 'professor' | 'aluno';
+  primeiroAcesso: boolean;
 }
 
 interface AuthState {
