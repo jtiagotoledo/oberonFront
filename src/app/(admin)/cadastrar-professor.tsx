@@ -109,14 +109,6 @@ export default function CadastrarProfessorScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
-      {/* Header */}
-      <View className="px-6 py-4 bg-white border-b border-gray-200 flex-row items-center justify-between">
-        <TouchableOpacity onPress={() => router.back()} className="p-1">
-          <Ionicons name="arrow-back" size={24} color="#2D3748" />
-        </TouchableOpacity>
-        <Text className="text-xl font-bold text-gray-800">Cadastrar Professor</Text>
-        <View className="w-6" />
-      </View>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
