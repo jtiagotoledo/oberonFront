@@ -11,28 +11,36 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Drawer } from 'expo-router/drawer';
 import { api } from '../../services/api';
 
-const DIAS_SEMANA = [
-  'Segunda-feira',
-  'Terça-feira',
-  'Quarta-feira',
-  'Quinta-feira',
-  'Sexta-feira',
+const DIAS = [
+  { key: 'Segunda-feira', label: 'Seg' },
+  { key: 'Terça-feira', label: 'Ter' },
+  { key: 'Quarta-feira', label: 'Qua' },
+  { key: 'Quinta-feira', label: 'Qui' },
+  { key: 'Sexta-feira', label: 'Sex' },
 ] as const;
+
+const HORARIOS_DISPONIVEIS = [
+  '06:00', '07:00', '08:00',
+  '09:00', '10:00', '11:00',
+  '12:00', '13:00', '14:00',
+  '15:00', '16:00', '17:00',
+  '18:00', '19:00', '20:00',
+];
 
 export default function CadastrarProfessorScreen() {
   const router = useRouter();
-  const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const modoEdicao = Boolean(id);
 
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
-  const [diaSelecionado, setDiaSelecionado] = useState<(typeof DIAS_SEMANA)[number]>('Segunda-feira');
+  const [diaSelecionado, setDiaSelecionado] = useState<string>('Segunda-feira');
+
   const [gradeHorarios, setGradeHorarios] = useState<Record<string, string[]>>({
     'Segunda-feira': [],
     'Terça-feira': [],
@@ -41,89 +49,90 @@ export default function CadastrarProfessorScreen() {
     'Sexta-feira': [],
   });
 
-  const [horaInicio, setHoraInicio] = useState('');
-  const [horaFim, setHoraFim] = useState('');
-
   const [loadingDados, setLoadingDados] = useState(false);
   const [loadingSalvar, setLoadingSalvar] = useState(false);
 
-  useEffect(() => {
-    navigation.setOptions({
-      title: modoEdicao ? 'Editar Professor' : 'Novo Professor',
+  const limparFormulario = () => {
+    setNome('');
+    setEmail('');
+    setTelefone('');
+    setDiaSelecionado('Segunda-feira');
+    setGradeHorarios({
+      'Segunda-feira': [],
+      'Terça-feira': [],
+      'Quarta-feira': [],
+      'Quinta-feira': [],
+      'Sexta-feira': [],
     });
-  }, [navigation, modoEdicao]);
-
-  useEffect(() => {
-    if (id) {
-      carregarProfessor();
-    }
-  }, [id]);
-
-  const carregarProfessor = async () => {
-    try {
-      setLoadingDados(true);
-      const res = await api.get(`/api/professores/${id}`);
-      const data = res.data;
-
-      setNome(data.nome || '');
-      setEmail(data.email || '');
-      setTelefone(data.telefone || '');
-
-      const novaGrade: Record<string, string[]> = {
-        'Segunda-feira': [],
-        'Terça-feira': [],
-        'Quarta-feira': [],
-        'Quinta-feira': [],
-        'Sexta-feira': [],
-      };
-
-      data.horarios?.forEach((h: { diaSemana: string; slots: string[] }) => {
-        if (novaGrade[h.diaSemana]) {
-          novaGrade[h.diaSemana] = h.slots || [];
-        }
-      });
-
-      setGradeHorarios(novaGrade);
-    } catch (error) {
-      Alert.alert('Erro', 'Não foi possível carregar os dados do professor.');
-    } finally {
-      setLoadingDados(false);
-    }
   };
 
-  const gerarIntervalos = () => {
-    const inicio = parseInt(horaInicio, 10);
-    const fim = parseInt(horaFim, 10);
+  useEffect(() => {
+    async function carregarProfessor() {
+      if (!id) {
+        limparFormulario();
+        return;
+      }
 
-    if (isNaN(inicio) || isNaN(fim) || inicio >= fim || inicio < 5 || fim > 23) {
-      Alert.alert('Horário Inválido', 'Insira horas cheias válidas (ex: das 07 às 12).');
-      return;
-    }
+      try {
+        setLoadingDados(true);
+        const res = await api.get(`/api/professores/${id}`);
+        const data = res.data;
 
-    const novosSlots: string[] = [];
-    for (let h = inicio; h < fim; h++) {
-      const formatado = `${String(h).padStart(2, '0')}:00`;
-      if (!novosSlots.includes(formatado)) {
-        novosSlots.push(formatado);
+        setNome(data.nome || '');
+        setEmail(data.email || '');
+        setTelefone(data.telefone || '');
+
+        const novaGrade: Record<string, string[]> = {
+          'Segunda-feira': [],
+          'Terça-feira': [],
+          'Quarta-feira': [],
+          'Quinta-feira': [],
+          'Sexta-feira': [],
+        };
+
+        data.horarios?.forEach((h: { diaSemana: string; slots: string[] }) => {
+          if (novaGrade[h.diaSemana]) {
+            novaGrade[h.diaSemana] = h.slots || [];
+          }
+        });
+
+        setGradeHorarios(novaGrade);
+      } catch (error: any) {
+        Alert.alert('Erro', 'Não foi possível carregar os dados do professor.');
+      } finally {
+        setLoadingDados(false);
       }
     }
 
-    setGradeHorarios((prev) => {
-      const slotsExistentes = prev[diaSelecionado] || [];
-      const uniao = Array.from(new Set([...slotsExistentes, ...novosSlots])).sort();
-      return { ...prev, [diaSelecionado]: uniao };
-    });
+    carregarProfessor();
+  }, [id]);
 
-    setHoraInicio('');
-    setHoraFim('');
+  const toggleHorario = (horario: string) => {
+    setGradeHorarios((prev) => {
+      const atuais = prev[diaSelecionado] || [];
+      const existe = atuais.includes(horario);
+      const atualizados = existe
+        ? atuais.filter((h) => h !== horario)
+        : [...atuais, horario].sort();
+
+      return {
+        ...prev,
+        [diaSelecionado]: atualizados,
+      };
+    });
   };
 
-  const removerSlot = (slot: string) => {
+  const limparDiaAtual = () => {
     setGradeHorarios((prev) => ({
       ...prev,
-      [diaSelecionado]: prev[diaSelecionado].filter((s) => s !== slot),
+      [diaSelecionado]: [],
     }));
   };
+
+  const totalAulasSemanais = Object.values(gradeHorarios).reduce(
+    (total, slots) => total + slots.length,
+    0
+  );
 
   const handleSalvar = async () => {
     if (!nome.trim() || !email.trim()) {
@@ -136,7 +145,7 @@ export default function CadastrarProfessorScreen() {
       .map(([diaSemana, slots]) => ({ diaSemana, slots }));
 
     if (horariosFormatados.length === 0) {
-      Alert.alert('Atenção', 'Cadastre ao menos um horário de atendimento para o professor.');
+      Alert.alert('Atenção', 'Selecione ao menos um horário de atendimento.');
       return;
     }
 
@@ -181,135 +190,132 @@ export default function CadastrarProfessorScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-50">
+      {/* Define o título dinamicamente de forma segura dentro do layout do Drawer */}
+      <Drawer.Screen options={{ title: modoEdicao ? 'Editar Professor' : 'Novo Professor' }} />
+
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
         <ScrollView
-          className="flex-1 px-6 pt-4"
+          className="flex-1 px-5 pt-4"
           contentContainerStyle={{ paddingBottom: 60 }}
           showsVerticalScrollIndicator={false}
         >
-          <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Dados Pessoais</Text>
+          {/* Dados Básicos */}
+          <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+            Dados Básicos
+          </Text>
 
-          <View className="bg-white p-4 rounded-xl border border-gray-200 mb-6">
+          <View className="bg-white p-4 rounded-2xl border border-gray-200 mb-6">
             <View>
               <Text className="text-xs font-semibold text-gray-600 mb-1">NOME COMPLETO</Text>
               <TextInput
-                placeholder="Ex: Roberto Silva"
+                placeholder="Ex: Carlos Silva"
                 value={nome}
                 onChangeText={setNome}
-                className="border border-gray-300 rounded-lg px-3 py-2.5 text-base text-gray-800 bg-white"
+                className="border border-gray-300 rounded-xl px-3 py-2.5 text-base text-gray-800 bg-white"
               />
             </View>
 
-            <View className="mt-3">
+            <View className="mt-4">
               <Text className="text-xs font-semibold text-gray-600 mb-1">E-MAIL</Text>
               <TextInput
-                placeholder="roberto@email.com"
+                placeholder="professor@muvup.com"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                className="border border-gray-300 rounded-lg px-3 py-2.5 text-base text-gray-800 bg-white"
+                className="border border-gray-300 rounded-xl px-3 py-2.5 text-base text-gray-800 bg-white"
               />
             </View>
 
-            <View className="mt-3">
-              <Text className="text-xs font-semibold text-gray-600 mb-1">TELEFONE</Text>
+            <View className="mt-4">
+              <Text className="text-xs font-semibold text-gray-600 mb-1">TELEFONE / WHATSAPP</Text>
               <TextInput
                 placeholder="(15) 99999-9999"
                 value={telefone}
                 onChangeText={setTelefone}
                 keyboardType="phone-pad"
-                className="border border-gray-300 rounded-lg px-3 py-2.5 text-base text-gray-800 bg-white"
+                className="border border-gray-300 rounded-xl px-3 py-2.5 text-base text-gray-800 bg-white"
               />
             </View>
           </View>
 
-          <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Disponibilidade de Horários</Text>
+          {/* Horário das Aulas */}
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Horário das Aulas
+            </Text>
+            <View className="bg-green-50 border border-green-200 px-3 py-1 rounded-full">
+              <Text className="text-xs font-bold text-muv-verde">
+                {totalAulasSemanais} aulas/semana
+              </Text>
+            </View>
+          </View>
 
-          <View className="bg-white p-4 rounded-xl border border-gray-200 mb-6">
-            {/* Seletor de dia */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
-              <View className="flex-row">
-                {DIAS_SEMANA.map((dia) => {
-                  const ativo = diaSelecionado === dia;
-                  const totalSlots = gradeHorarios[dia]?.length || 0;
-                  return (
-                    <TouchableOpacity
-                      key={dia}
-                      onPress={() => setDiaSelecionado(dia)}
-                      className={`mr-2 px-3 py-2 rounded-lg border ${
-                        ativo ? 'bg-muv-verde border-muv-verde' : 'bg-gray-50 border-gray-200'
-                      }`}
+          <View className="bg-white p-4 rounded-2xl border border-gray-200 mb-6">
+            {/* Seletor de Dias */}
+            <View className="flex-row justify-between mb-4 bg-gray-100 p-1 rounded-xl">
+              {DIAS.map((dia) => {
+                const ativo = diaSelecionado === dia.key;
+                return (
+                  <TouchableOpacity
+                    key={dia.key}
+                    onPress={() => setDiaSelecionado(dia.key)}
+                    style={{ backgroundColor: ativo ? '#63B887' : 'transparent' }}
+                    className="flex-1 py-2 rounded-lg items-center"
+                  >
+                    <Text
+                      style={{ color: ativo ? '#FFFFFF' : '#4A5568' }}
+                      className="text-xs font-bold"
                     >
-                      <Text className={`text-xs font-bold ${ativo ? 'text-white' : 'text-gray-700'}`}>
-                        {dia.replace('-feira', '')} {totalSlots > 0 ? `(${totalSlots})` : ''}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
+                      {dia.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
-            {/* Inserir intervalo */}
-            <View className="flex-row items-center mb-4">
-              <View className="flex-1 mr-2">
-                <Text className="text-[10px] font-bold text-gray-500 mb-1">INÍCIO (HORA)</Text>
-                <TextInput
-                  placeholder="07"
-                  value={horaInicio}
-                  onChangeText={setHoraInicio}
-                  keyboardType="numeric"
-                  maxLength={2}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-center text-gray-800 bg-white"
-                />
-              </View>
-
-              <View className="flex-1 mr-2">
-                <Text className="text-[10px] font-bold text-gray-500 mb-1">FIM (HORA)</Text>
-                <TextInput
-                  placeholder="12"
-                  value={horaFim}
-                  onChangeText={setHoraFim}
-                  keyboardType="numeric"
-                  maxLength={2}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-center text-gray-800 bg-white"
-                />
-              </View>
-
+            {/* Limpar Dia */}
+            <View className="flex-row justify-end mb-3">
               <TouchableOpacity
-                onPress={gerarIntervalos}
-                className="mt-4 px-4 py-2.5 rounded-lg bg-gray-800 items-center justify-center"
+                onPress={limparDiaAtual}
+                className="px-3 py-1 rounded-md bg-red-50 border border-red-100"
               >
-                <Text className="text-white text-xs font-bold">Adicionar</Text>
+                <Text className="text-xs font-bold text-red-500">Limpar</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Slots cadastrados para o dia */}
-            <Text className="text-xs font-semibold text-gray-600 mb-2">Horários de {diaSelecionado}:</Text>
-            {slotsDoDia.length === 0 ? (
-              <Text className="text-xs text-gray-400 italic">Nenhum horário definido para este dia.</Text>
-            ) : (
-              <View className="flex-row flex-wrap">
-                {slotsDoDia.map((slot) => (
-                  <View
-                    key={slot}
-                    className="flex-row items-center bg-green-50 border border-green-200 rounded-lg px-2.5 py-1.5 mr-2 mb-2"
+            {/* Chips de Horários */}
+            <View className="flex-row flex-wrap justify-between">
+              {HORARIOS_DISPONIVEIS.map((hora) => {
+                const selecionado = slotsDoDia.includes(hora);
+                return (
+                  <TouchableOpacity
+                    key={hora}
+                    onPress={() => toggleHorario(hora)}
+                    style={{
+                      backgroundColor: selecionado ? '#63B887' : '#FFFFFF',
+                      borderColor: selecionado ? '#63B887' : '#E2E8F0',
+                    }}
+                    className="w-[31%] py-3 mb-3 rounded-xl border items-center justify-center"
                   >
-                    <Text className="text-xs font-bold text-muv-verde mr-1.5">{slot}</Text>
-                    <TouchableOpacity onPress={() => removerSlot(slot)}>
-                      <Ionicons name="close-circle" size={14} color="#63B887" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
+                    <Text
+                      style={{ color: selecionado ? '#FFFFFF' : '#2D3748' }}
+                      className="text-sm font-bold"
+                    >
+                      {hora}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
 
+          {/* Botão Salvar */}
           <TouchableOpacity
             onPress={handleSalvar}
             disabled={loadingSalvar}
-            className={`w-full py-4 rounded-xl items-center justify-center ${
-              loadingSalvar ? 'bg-muv-verde/70' : 'bg-muv-verde active:opacity-90'
+            className={`w-full py-4 rounded-2xl items-center justify-center ${
+              loadingSalvar ? 'bg-muv-verde/70' : 'bg-muv-verde active:opacity-90 shadow-sm'
             }`}
           >
             {loadingSalvar ? (

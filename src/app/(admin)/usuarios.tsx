@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -19,6 +19,7 @@ type AbaTipo = 'professores' | 'alunos' | 'admins';
 
 export default function GestaoUsuariosScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const usuarioLogado = useAuthStore((state) => state.user);
 
@@ -31,9 +32,9 @@ export default function GestaoUsuariosScreen() {
   const [alunos, setAlunos] = useState<any[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
 
-  const carregarDadosAba = async (aba: AbaTipo) => {
+  const carregarDadosAba = useCallback(async (aba: AbaTipo, silencioso = false) => {
     try {
-      setCarregando(true);
+      if (!silencioso) setCarregando(true);
       if (aba === 'professores') {
         const res = await api.get('/api/professores');
         setProfessores(res.data);
@@ -50,15 +51,23 @@ export default function GestaoUsuariosScreen() {
       setCarregando(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     carregarDadosAba(abaAtiva);
-  }, [abaAtiva]);
+  }, [abaAtiva, carregarDadosAba]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      carregarDadosAba(abaAtiva, true);
+    });
+
+    return unsubscribe;
+  }, [navigation, abaAtiva, carregarDadosAba]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    carregarDadosAba(abaAtiva);
+    carregarDadosAba(abaAtiva, true);
   };
 
   const listaAtual = () => {
@@ -94,7 +103,6 @@ export default function GestaoUsuariosScreen() {
   };
 
   const handleExcluir = (item: any) => {
-    // Evita que o admin logado exclua a si mesmo
     if (abaAtiva === 'admins' && item._id === usuarioLogado?.id) {
       Alert.alert('Ação bloqueada', 'Você não pode excluir sua própria conta de administrador.');
       return;
@@ -117,7 +125,7 @@ export default function GestaoUsuariosScreen() {
 
               await api.delete(endpoint);
               Alert.alert('Sucesso', 'Registro excluído com sucesso.');
-              carregarDadosAba(abaAtiva);
+              carregarDadosAba(abaAtiva, true);
             } catch (error: any) {
               const msg = error.response?.data?.erro || 'Erro ao excluir usuário.';
               Alert.alert('Erro', msg);
@@ -133,22 +141,14 @@ export default function GestaoUsuariosScreen() {
 
     return (
       <View className="bg-white p-4 rounded-xl border border-gray-200 mb-3 shadow-sm">
-        {/* Cabeçalho do Card */}
         <View className="flex-row items-center justify-between mb-1">
           <Text className="text-base font-bold text-gray-800 flex-1 mr-2" numberOfLines={1}>
             {item.nome}
           </Text>
-
-          {item.primeiroAcesso && (
-            <View className="px-2 py-0.5 rounded bg-amber-50 border border-amber-200">
-              <Text className="text-[10px] font-bold text-amber-700">1º Acesso Pendente</Text>
-            </View>
-          )}
         </View>
 
         <Text className="text-xs text-gray-500 mb-2">{item.email}</Text>
 
-        {/* Metadados por Papel */}
         {abaAtiva === 'professores' && (
           <View className="pt-2 border-t border-gray-100 mt-1">
             <View className="flex-row items-center justify-between">
@@ -157,7 +157,7 @@ export default function GestaoUsuariosScreen() {
                 <Text className="text-xs text-gray-600 ml-1">{item.telefone || 'Sem telefone'}</Text>
               </View>
               <Text className="text-xs font-semibold text-muv-verde bg-green-50 px-2 py-0.5 rounded border border-green-200">
-                {item.horarios?.reduce((acc: number, h: any) => acc + (h.slots?.length || 0), 0) || 0} slots
+                {item.horarios?.reduce((acc: number, h: any) => acc + (h.slots?.length || 0), 0) || 0} Aulas
               </Text>
             </View>
           </View>
@@ -191,14 +191,13 @@ export default function GestaoUsuariosScreen() {
         {abaAtiva === 'admins' && (
           <View className="pt-2 border-t border-gray-100 mt-1">
             <View className="flex-row items-center">
-              <Ionicons name="shield-outline" size={13} color="#718096" />
+              <Ionicons name="call-outline" size={13} color="#718096" />
               <Text className="text-xs text-gray-600 ml-1">{item.telefone || 'Sem telefone'}</Text>
             </View>
           </View>
         )}
 
-        {/* Barra de Ações: Editar e Excluir */}
-        <View className="flex-row justify-end items-center pt-3 mt-3 border-t border-gray-100 space-x-2">
+        <View className="flex-row justify-end items-center pt-3 mt-3 border-t border-gray-100">
           <TouchableOpacity
             onPress={() => handleEditar(item)}
             className="flex-row items-center px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 active:bg-gray-100"
@@ -225,7 +224,6 @@ export default function GestaoUsuariosScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-50">
-      {/* Barra de Busca */}
       <View className="px-5 pt-4 pb-2 bg-white border-b border-gray-200">
         <View className="flex-row items-center bg-gray-100 px-3 py-2 rounded-xl border border-gray-200 mb-3">
           <Ionicons name="search" size={18} color="#718096" />
@@ -243,7 +241,6 @@ export default function GestaoUsuariosScreen() {
           )}
         </View>
 
-        {/* Abas */}
         <View className="flex-row bg-gray-100 p-1 rounded-xl">
           <TouchableOpacity
             onPress={() => setAbaAtiva('professores')}
@@ -292,7 +289,6 @@ export default function GestaoUsuariosScreen() {
         </View>
       </View>
 
-      {/* Lista */}
       {carregando && !refreshing ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#63B887" />
@@ -324,7 +320,6 @@ export default function GestaoUsuariosScreen() {
         />
       )}
 
-      {/* Botão Flutuante (FAB) */}
       <TouchableOpacity
         onPress={handleNovoCadastro}
         activeOpacity={0.85}
