@@ -1,136 +1,164 @@
-import { useState } from 'react';
-import {  View,  Text,  TextInput,  TouchableOpacity,  KeyboardAvoidingView,  Platform,  TouchableWithoutFeedback,  Keyboard,  ScrollView,  Alert,  ActivityIndicator,} from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { api } from '../../services/api';
 
 export default function CadastrarAdminScreen() {
+  const router = useRouter();
+  const navigation = useNavigation();
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const modoEdicao = Boolean(id);
+
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
-  const handleCadastrar = async () => {
-    if (!nome.trim() || !email.trim() || !telefone.trim()) {
-      Alert.alert('Atenção', 'Preencha todos os campos obrigatórios.');
-      return;
+  const [loadingDados, setLoadingDados] = useState(false);
+  const [loadingSalvar, setLoadingSalvar] = useState(false);
+
+  useEffect(() => {
+    navigation.setOptions({
+      title: modoEdicao ? 'Editar Administrador' : 'Novo Administrador',
+    });
+  }, [navigation, modoEdicao]);
+
+  useEffect(() => {
+    if (id) {
+      carregarAdmin();
     }
+  }, [id]);
 
-    Keyboard.dismiss();
-    setIsLoading(true);
-
+  const carregarAdmin = async () => {
     try {
-      await api.post('/api/admins', {
-        nome,
-        email: email.trim().toLowerCase(),
-        telefone,
-      });
+      setLoadingDados(true);
+      const res = await api.get(`/api/admins/${id}`);
+      const data = res.data;
 
-      Alert.alert(
-        'Sucesso!',
-        'Administrador cadastrado. As instruções de primeiro acesso foram enviadas.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setNome('');
-              setEmail('');
-              setTelefone('');
-            },
-          },
-        ]
-      );
-    } catch (error: any) {
-      const mensagemErro =
-        error.response?.data?.erro ||
-        error.response?.data?.mensagem ||
-        'Não foi possível cadastrar o administrador.';
-      Alert.alert('Erro no cadastro', mensagemErro);
+      setNome(data.nome || '');
+      setEmail(data.email || '');
+      setTelefone(data.telefone || '');
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível carregar os dados do administrador.');
     } finally {
-      setIsLoading(false);
+      setLoadingDados(false);
     }
   };
 
+  const handleSalvar = async () => {
+    if (!nome.trim() || !email.trim()) {
+      Alert.alert('Atenção', 'Nome e e-mail são obrigatórios.');
+      return;
+    }
+
+    try {
+      setLoadingSalvar(true);
+      const payload = {
+        nome: nome.trim(),
+        email: email.trim().toLowerCase(),
+        telefone: telefone.trim(),
+      };
+
+      if (modoEdicao) {
+        await api.put(`/api/admins/${id}`, payload);
+        Alert.alert('Sucesso', 'Administrador atualizado com sucesso!', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      } else {
+        await api.post('/api/admins', payload);
+        Alert.alert('Sucesso', 'Administrador cadastrado com sucesso! A senha inicial foi enviada por e-mail.', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      }
+    } catch (error: any) {
+      const msg = error.response?.data?.erro || 'Erro ao salvar administrador.';
+      Alert.alert('Erro', msg);
+    } finally {
+      setLoadingSalvar(false);
+    }
+  };
+
+  if (loadingDados) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50">
+        <ActivityIndicator size="large" color="#63B887" />
+        <Text className="text-gray-500 text-sm mt-3 font-medium">Carregando dados...</Text>
+      </View>
+    );
+  }
+
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-gray-50"
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-50">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1, padding: 24, justifyContent: 'center' }}
-          keyboardShouldPersistTaps="handled"
+          className="flex-1 px-6 pt-4"
+          contentContainerStyle={{ paddingBottom: 60 }}
           showsVerticalScrollIndicator={false}
         >
-          <View className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <Text className="text-2xl font-bold text-gray-800 mb-2">
-              Novo Administrador
-            </Text>
-            <Text className="text-sm text-gray-500 mb-6">
-              O novo gestor terá acesso total aos cadastros, horários e relatórios do estúdio.
-            </Text>
+          <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Dados Pessoais</Text>
 
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-gray-700 mb-1.5">
-                Nome Completo
-              </Text>
+          <View className="bg-white p-4 rounded-xl border border-gray-200 mb-6">
+            <View>
+              <Text className="text-xs font-semibold text-gray-600 mb-1">NOME COMPLETO</Text>
               <TextInput
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base text-gray-800 bg-white focus:border-muv-verde"
-                placeholder="Ex: Maria Silva"
-                placeholderTextColor="#A0AEC0"
-                editable={!isLoading}
+                placeholder="Ex: Ana Souza"
                 value={nome}
                 onChangeText={setNome}
+                className="border border-gray-300 rounded-lg px-3 py-2.5 text-base text-gray-800 bg-white"
               />
             </View>
 
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-gray-700 mb-1.5">
-                E-mail
-              </Text>
+            <View className="mt-3">
+              <Text className="text-xs font-semibold text-gray-600 mb-1">E-MAIL</Text>
               <TextInput
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base text-gray-800 bg-white focus:border-muv-verde"
-                placeholder="exemplo@muvup.com"
-                placeholderTextColor="#A0AEC0"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                editable={!isLoading}
+                placeholder="ana@email.com"
                 value={email}
                 onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                className="border border-gray-300 rounded-lg px-3 py-2.5 text-base text-gray-800 bg-white"
               />
             </View>
 
-            <View className="mb-6">
-              <Text className="text-sm font-semibold text-gray-700 mb-1.5">
-                Telefone / WhatsApp
-              </Text>
+            <View className="mt-3">
+              <Text className="text-xs font-semibold text-gray-600 mb-1">TELEFONE</Text>
               <TextInput
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base text-gray-800 bg-white focus:border-muv-verde"
-                placeholder="(00) 00000-0000"
-                placeholderTextColor="#A0AEC0"
-                keyboardType="phone-pad"
-                editable={!isLoading}
+                placeholder="(15) 99999-9999"
                 value={telefone}
                 onChangeText={setTelefone}
+                keyboardType="phone-pad"
+                className="border border-gray-300 rounded-lg px-3 py-2.5 text-base text-gray-800 bg-white"
               />
             </View>
-
-            <TouchableOpacity
-              className={`w-full rounded-xl py-4 items-center justify-center flex-row shadow-sm ${
-                isLoading ? 'bg-muv-verde/70' : 'bg-muv-verde active:opacity-85'
-              }`}
-              onPress={handleCadastrar}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text className="text-white font-bold text-base">
-                  Cadastrar Administrador
-                </Text>
-              )}
-            </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            onPress={handleSalvar}
+            disabled={loadingSalvar}
+            className={`w-full py-4 rounded-xl items-center justify-center ${
+              loadingSalvar ? 'bg-muv-verde/70' : 'bg-muv-verde active:opacity-90'
+            }`}
+          >
+            {loadingSalvar ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text className="text-white font-bold text-base">
+                {modoEdicao ? 'Atualizar Administrador' : 'Cadastrar Administrador'}
+              </Text>
+            )}
+          </TouchableOpacity>
         </ScrollView>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

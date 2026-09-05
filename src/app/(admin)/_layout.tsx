@@ -1,3 +1,4 @@
+import React from 'react';
 import { View, Text, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { Drawer } from 'expo-router/drawer';
 import { router } from 'expo-router';
@@ -61,11 +62,11 @@ function CustomDrawerContent({ navigation, state }: any) {
 
   const iniciais = user?.name
     ? user.name
-      .split(' ')
-      .map((n: string) => n[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase()
+        .split(' ')
+        .map((n: string) => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase()
     : 'U';
 
   return (
@@ -105,8 +106,9 @@ function CustomDrawerContent({ navigation, state }: any) {
                 navigation.closeDrawer();
                 router.push(item.caminho as any);
               }}
-              className={`flex-row items-center px-4 py-3.5 mb-1.5 rounded-xl ${ativo ? 'bg-green-50' : 'bg-transparent active:bg-gray-100'
-                }`}
+              className={`flex-row items-center px-4 py-3.5 mb-1.5 rounded-xl ${
+                ativo ? 'bg-green-50' : 'bg-transparent active:bg-gray-100'
+              }`}
             >
               <Ionicons
                 name={item.icone}
@@ -114,8 +116,9 @@ function CustomDrawerContent({ navigation, state }: any) {
                 color={ativo ? '#63B887' : '#4A5568'}
               />
               <Text
-                className={`ml-3.5 text-sm font-semibold ${ativo ? 'text-muv-verde font-bold' : 'text-gray-700'
-                  }`}
+                className={`ml-3.5 text-sm font-semibold ${
+                  ativo ? 'text-muv-verde font-bold' : 'text-gray-700'
+                }`}
               >
                 {item.titulo}
               </Text>
@@ -124,7 +127,7 @@ function CustomDrawerContent({ navigation, state }: any) {
         })}
       </ScrollView>
 
-      {/* 3. Rodapé com Botão Sair protegido pela Safe Area */}
+      {/* 3. Rodapé com Botão Sair */}
       <View
         style={{ paddingBottom: Math.max(insets.bottom, 16) + 12 }}
         className="px-4 pt-4 border-t border-gray-200 bg-gray-50"
@@ -163,8 +166,7 @@ export default function AdminLayout() {
         <Drawer.Screen name="cadastrar-professor" options={{ title: 'Novo Professor' }} />
         <Drawer.Screen name="cadastrar-aluno" options={{ title: 'Novo Aluno' }} />
         <Drawer.Screen name="cadastrar-admin" options={{ title: 'Novo Administrador' }} />
-        <Drawer.Screen name="usuarios" options={{ title: 'Usuários Cadastrados', }}
-        />
+        <Drawer.Screen name="usuarios" options={{ title: 'Usuários Cadastrados' }} />
       </Drawer>
     </>
   );

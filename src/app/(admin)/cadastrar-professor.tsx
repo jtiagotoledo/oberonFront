@@ -1,34 +1,39 @@
-import { useState } from 'react';
-import {  View,  Text,  TextInput,  TouchableOpacity,  ScrollView,  KeyboardAvoidingView,  Platform,  Alert,  ActivityIndicator,} from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../services/api';
 
 const DIAS_SEMANA = [
-  { id: 'Segunda-feira', label: 'Seg' },
-  { id: 'Terça-feira', label: 'Ter' },
-  { id: 'Quarta-feira', label: 'Qua' },
-  { id: 'Quinta-feira', label: 'Qui' },
-  { id: 'Sexta-feira', label: 'Sex' },
+  'Segunda-feira',
+  'Terça-feira',
+  'Quarta-feira',
+  'Quinta-feira',
+  'Sexta-feira',
 ] as const;
 
-type DiaSemanaTipo = (typeof DIAS_SEMANA)[number]['id'];
-
-const HORARIOS_INICIO = [
-  '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
-  '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
-];
-
 export default function CadastrarProfessorScreen() {
+  const router = useRouter();
+  const navigation = useNavigation();
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const modoEdicao = Boolean(id);
+
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const [diaAtivo, setDiaAtivo] = useState<DiaSemanaTipo>('Segunda-feira');
-
-  const [gradeHorarios, setGradeHorarios] = useState<Record<DiaSemanaTipo, string[]>>({
+  const [diaSelecionado, setDiaSelecionado] = useState<(typeof DIAS_SEMANA)[number]>('Segunda-feira');
+  const [gradeHorarios, setGradeHorarios] = useState<Record<string, string[]>>({
     'Segunda-feira': [],
     'Terça-feira': [],
     'Quarta-feira': [],
@@ -36,43 +41,91 @@ export default function CadastrarProfessorScreen() {
     'Sexta-feira': [],
   });
 
-  const alternarHorario = (horario: string) => {
-    setGradeHorarios((prev) => {
-      const horariosDoDia = prev[diaAtivo] || [];
-      const jaExiste = horariosDoDia.includes(horario);
+  const [horaInicio, setHoraInicio] = useState('');
+  const [horaFim, setHoraFim] = useState('');
 
-      return {
-        ...prev,
-        [diaAtivo]: jaExiste
-          ? horariosDoDia.filter((h) => h !== horario)
-          : [...horariosDoDia, horario].sort(),
-      };
+  const [loadingDados, setLoadingDados] = useState(false);
+  const [loadingSalvar, setLoadingSalvar] = useState(false);
+
+  useEffect(() => {
+    navigation.setOptions({
+      title: modoEdicao ? 'Editar Professor' : 'Novo Professor',
     });
+  }, [navigation, modoEdicao]);
+
+  useEffect(() => {
+    if (id) {
+      carregarProfessor();
+    }
+  }, [id]);
+
+  const carregarProfessor = async () => {
+    try {
+      setLoadingDados(true);
+      const res = await api.get(`/api/professores/${id}`);
+      const data = res.data;
+
+      setNome(data.nome || '');
+      setEmail(data.email || '');
+      setTelefone(data.telefone || '');
+
+      const novaGrade: Record<string, string[]> = {
+        'Segunda-feira': [],
+        'Terça-feira': [],
+        'Quarta-feira': [],
+        'Quinta-feira': [],
+        'Sexta-feira': [],
+      };
+
+      data.horarios?.forEach((h: { diaSemana: string; slots: string[] }) => {
+        if (novaGrade[h.diaSemana]) {
+          novaGrade[h.diaSemana] = h.slots || [];
+        }
+      });
+
+      setGradeHorarios(novaGrade);
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível carregar os dados do professor.');
+    } finally {
+      setLoadingDados(false);
+    }
   };
 
-  const selecionarTurno = (periodo: 'manha' | 'tarde' | 'limpar') => {
-    if (periodo === 'limpar') {
-      setGradeHorarios((prev) => ({ ...prev, [diaAtivo]: [] }));
+  const gerarIntervalos = () => {
+    const inicio = parseInt(horaInicio, 10);
+    const fim = parseInt(horaFim, 10);
+
+    if (isNaN(inicio) || isNaN(fim) || inicio >= fim || inicio < 5 || fim > 23) {
+      Alert.alert('Horário Inválido', 'Insira horas cheias válidas (ex: das 07 às 12).');
       return;
     }
 
-    const novosHorarios =
-      periodo === 'manha'
-        ? ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00']
-        : ['12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+    const novosSlots: string[] = [];
+    for (let h = inicio; h < fim; h++) {
+      const formatado = `${String(h).padStart(2, '0')}:00`;
+      if (!novosSlots.includes(formatado)) {
+        novosSlots.push(formatado);
+      }
+    }
 
+    setGradeHorarios((prev) => {
+      const slotsExistentes = prev[diaSelecionado] || [];
+      const uniao = Array.from(new Set([...slotsExistentes, ...novosSlots])).sort();
+      return { ...prev, [diaSelecionado]: uniao };
+    });
+
+    setHoraInicio('');
+    setHoraFim('');
+  };
+
+  const removerSlot = (slot: string) => {
     setGradeHorarios((prev) => ({
       ...prev,
-      [diaAtivo]: Array.from(new Set([...prev[diaAtivo], ...novosHorarios])).sort(),
+      [diaSelecionado]: prev[diaSelecionado].filter((s) => s !== slot),
     }));
   };
 
-  const totalAulasSemana = Object.values(gradeHorarios).reduce(
-    (total, lista) => total + lista.length,
-    0
-  );
-
-  const handleCadastrar = async () => {
+  const handleSalvar = async () => {
     if (!nome.trim() || !email.trim()) {
       Alert.alert('Atenção', 'Nome e e-mail são obrigatórios.');
       return;
@@ -80,55 +133,67 @@ export default function CadastrarProfessorScreen() {
 
     const horariosFormatados = Object.entries(gradeHorarios)
       .filter(([_, slots]) => slots.length > 0)
-      .map(([diaSemana, slots]) => ({
-        diaSemana,
-        slots,
-      }));
+      .map(([diaSemana, slots]) => ({ diaSemana, slots }));
+
+    if (horariosFormatados.length === 0) {
+      Alert.alert('Atenção', 'Cadastre ao menos um horário de atendimento para o professor.');
+      return;
+    }
 
     try {
-      setLoading(true);
-      await api.post('/api/professores', {
+      setLoadingSalvar(true);
+      const payload = {
         nome: nome.trim(),
         email: email.trim().toLowerCase(),
         telefone: telefone.trim(),
         horarios: horariosFormatados,
-      });
+      };
 
-      Alert.alert(
-        'Sucesso',
-        'Professor cadastrado com sucesso! A senha provisória foi enviada por e-mail.',
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
+      if (modoEdicao) {
+        await api.put(`/api/professores/${id}`, payload);
+        Alert.alert('Sucesso', 'Professor atualizado com sucesso!', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      } else {
+        await api.post('/api/professores', payload);
+        Alert.alert('Sucesso', 'Professor cadastrado com sucesso! A senha inicial foi enviada por e-mail.', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      }
     } catch (error: any) {
-      const msg = error.response?.data?.erro || 'Erro ao cadastrar professor.';
+      const msg = error.response?.data?.erro || 'Erro ao salvar professor.';
       Alert.alert('Erro', msg);
     } finally {
-      setLoading(false);
+      setLoadingSalvar(false);
     }
   };
 
-  return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+  if (loadingDados) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50">
+        <ActivityIndicator size="large" color="#63B887" />
+        <Text className="text-gray-500 text-sm mt-3 font-medium">Carregando professor...</Text>
+      </View>
+    );
+  }
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        className="flex-1"
-      >
+  const slotsDoDia = gradeHorarios[diaSelecionado] || [];
+
+  return (
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-50">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
         <ScrollView
           className="flex-1 px-6 pt-4"
           contentContainerStyle={{ paddingBottom: 60 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Dados Pessoais */}
-          <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-            Dados Básicos
-          </Text>
+          <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Dados Pessoais</Text>
 
-          <View className="bg-white p-4 rounded-xl border border-gray-200 mb-6 space-y-4">
+          <View className="bg-white p-4 rounded-xl border border-gray-200 mb-6">
             <View>
               <Text className="text-xs font-semibold text-gray-600 mb-1">NOME COMPLETO</Text>
               <TextInput
-                placeholder="Ex: Carlos Silva"
+                placeholder="Ex: Roberto Silva"
                 value={nome}
                 onChangeText={setNome}
                 className="border border-gray-300 rounded-lg px-3 py-2.5 text-base text-gray-800 bg-white"
@@ -138,7 +203,7 @@ export default function CadastrarProfessorScreen() {
             <View className="mt-3">
               <Text className="text-xs font-semibold text-gray-600 mb-1">E-MAIL</Text>
               <TextInput
-                placeholder="professor@muvup.com"
+                placeholder="roberto@email.com"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -148,7 +213,7 @@ export default function CadastrarProfessorScreen() {
             </View>
 
             <View className="mt-3">
-              <Text className="text-xs font-semibold text-gray-600 mb-1">TELEFONE / WHATSAPP</Text>
+              <Text className="text-xs font-semibold text-gray-600 mb-1">TELEFONE</Text>
               <TextInput
                 placeholder="(15) 99999-9999"
                 value={telefone}
@@ -159,98 +224,100 @@ export default function CadastrarProfessorScreen() {
             </View>
           </View>
 
-          {/* Horários das Aulas */}
-          <View className="flex-row items-center justify-between mb-3">
-            <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-              Horário das Aulas
-            </Text>
-            <Text className="text-xs font-bold text-muv-verde bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
-              {totalAulasSemana} aulas/semana
-            </Text>
-          </View>
+          <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Disponibilidade de Horários</Text>
 
           <View className="bg-white p-4 rounded-xl border border-gray-200 mb-6">
-            {/* Seletor de Dias (Tabs) */}
-            <View className="flex-row justify-between bg-gray-100 p-1 rounded-lg mb-4">
-              {DIAS_SEMANA.map((dia) => {
-                const ativo = diaAtivo === dia.id;
-                const totalDia = gradeHorarios[dia.id]?.length || 0;
-
-                return (
-                  <TouchableOpacity
-                    key={dia.id}
-                    onPress={() => setDiaAtivo(dia.id)}
-                    className={`flex-1 py-2 rounded-md items-center justify-center ${
-                      ativo ? 'bg-muv-verde' : 'bg-transparent'
-                    }`}
-                  >
-                    <Text className={`font-bold text-xs ${ativo ? 'text-white' : 'text-gray-600'}`}>
-                      {dia.label}
-                    </Text>
-                    {totalDia > 0 && (
-                      <Text
-                        className={`text-[10px] font-semibold mt-0.5 ${
-                          ativo ? 'text-white/90' : 'text-muv-verde'
-                        }`}
-                      >
-                        {totalDia}
+            {/* Seletor de dia */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
+              <View className="flex-row">
+                {DIAS_SEMANA.map((dia) => {
+                  const ativo = diaSelecionado === dia;
+                  const totalSlots = gradeHorarios[dia]?.length || 0;
+                  return (
+                    <TouchableOpacity
+                      key={dia}
+                      onPress={() => setDiaSelecionado(dia)}
+                      className={`mr-2 px-3 py-2 rounded-lg border ${
+                        ativo ? 'bg-muv-verde border-muv-verde' : 'bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      <Text className={`text-xs font-bold ${ativo ? 'text-white' : 'text-gray-700'}`}>
+                        {dia.replace('-feira', '')} {totalSlots > 0 ? `(${totalSlots})` : ''}
                       </Text>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
 
-            {/* Ações de Seleção Rápida */}
-            <View className="flex-row justify-end space-x-2 mb-4">
+            {/* Inserir intervalo */}
+            <View className="flex-row items-center mb-4">
+              <View className="flex-1 mr-2">
+                <Text className="text-[10px] font-bold text-gray-500 mb-1">INÍCIO (HORA)</Text>
+                <TextInput
+                  placeholder="07"
+                  value={horaInicio}
+                  onChangeText={setHoraInicio}
+                  keyboardType="numeric"
+                  maxLength={2}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-center text-gray-800 bg-white"
+                />
+              </View>
+
+              <View className="flex-1 mr-2">
+                <Text className="text-[10px] font-bold text-gray-500 mb-1">FIM (HORA)</Text>
+                <TextInput
+                  placeholder="12"
+                  value={horaFim}
+                  onChangeText={setHoraFim}
+                  keyboardType="numeric"
+                  maxLength={2}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-center text-gray-800 bg-white"
+                />
+              </View>
+
               <TouchableOpacity
-                onPress={() => selecionarTurno('limpar')}
-                className="px-2.5 py-1 bg-red-50 rounded border border-red-100 ml-2"
+                onPress={gerarIntervalos}
+                className="mt-4 px-4 py-2.5 rounded-lg bg-gray-800 items-center justify-center"
               >
-                <Text className="text-[11px] font-semibold text-red-500">Limpar</Text>
+                <Text className="text-white text-xs font-bold">Adicionar</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Grade com 3 Colunas de Horários Simples */}
-            <View className="flex-row flex-wrap justify-between">
-              {HORARIOS_INICIO.map((hora) => {
-                const selecionado = gradeHorarios[diaAtivo]?.includes(hora);
-                return (
-                  <TouchableOpacity
-                    key={hora}
-                    onPress={() => alternarHorario(hora)}
-                    activeOpacity={0.7}
-                    className={`w-[30%] py-3 mb-2.5 rounded-lg border items-center justify-center ${
-                      selecionado
-                        ? 'bg-muv-verde border-muv-verde'
-                        : 'bg-gray-50 border-gray-200'
-                    }`}
+            {/* Slots cadastrados para o dia */}
+            <Text className="text-xs font-semibold text-gray-600 mb-2">Horários de {diaSelecionado}:</Text>
+            {slotsDoDia.length === 0 ? (
+              <Text className="text-xs text-gray-400 italic">Nenhum horário definido para este dia.</Text>
+            ) : (
+              <View className="flex-row flex-wrap">
+                {slotsDoDia.map((slot) => (
+                  <View
+                    key={slot}
+                    className="flex-row items-center bg-green-50 border border-green-200 rounded-lg px-2.5 py-1.5 mr-2 mb-2"
                   >
-                    <Text
-                      className={`text-sm font-semibold ${
-                        selecionado ? 'text-white' : 'text-gray-700'
-                      }`}
-                    >
-                      {hora}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                    <Text className="text-xs font-bold text-muv-verde mr-1.5">{slot}</Text>
+                    <TouchableOpacity onPress={() => removerSlot(slot)}>
+                      <Ionicons name="close-circle" size={14} color="#63B887" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
 
-          {/* Botão de Envio */}
           <TouchableOpacity
-            onPress={handleCadastrar}
-            disabled={loading}
+            onPress={handleSalvar}
+            disabled={loadingSalvar}
             className={`w-full py-4 rounded-xl items-center justify-center ${
-              loading ? 'bg-muv-verde/70' : 'bg-muv-verde active:opacity-90'
+              loadingSalvar ? 'bg-muv-verde/70' : 'bg-muv-verde active:opacity-90'
             }`}
           >
-            {loading ? (
+            {loadingSalvar ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <Text className="text-white font-bold text-base">Cadastrar Professor</Text>
+              <Text className="text-white font-bold text-base">
+                {modoEdicao ? 'Atualizar Professor' : 'Cadastrar Professor'}
+              </Text>
             )}
           </TouchableOpacity>
         </ScrollView>
