@@ -9,7 +9,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 
 function CustomDrawerContent({ navigation, state }: any) {
   const insets = useSafeAreaInsets();
-  const user = useAuthStore((state) => state.user);
+  const user = useAuthStore((s) => s.user);
 
   const handleLogout = () => {
     Alert.alert('Sair da conta', 'Deseja realmente encerrar sua sessão?', [
@@ -31,30 +31,35 @@ function CustomDrawerContent({ navigation, state }: any) {
       titulo: 'Visão Geral',
       icone: 'home-outline' as const,
       caminho: '/(admin)',
+      params: {},
     },
     {
       nome: 'cadastrar-professor',
       titulo: 'Cadastrar Professor',
       icone: 'person-add-outline' as const,
       caminho: '/(admin)/cadastrar-professor',
+      params: { id: '' },
     },
     {
       nome: 'cadastrar-aluno',
       titulo: 'Cadastrar Aluno',
       icone: 'people-outline' as const,
       caminho: '/(admin)/cadastrar-aluno',
+      params: { id: '' },
     },
     {
       nome: 'cadastrar-admin',
       titulo: 'Cadastrar Admin',
       icone: 'shield-checkmark-outline' as const,
       caminho: '/(admin)/cadastrar-admin',
+      params: { id: '' },
     },
     {
       nome: 'usuarios',
       titulo: 'Gerenciar Usuários',
       icone: 'people-circle-outline' as const,
       caminho: '/(admin)/usuarios',
+      params: {},
     },
   ];
 
@@ -71,7 +76,6 @@ function CustomDrawerContent({ navigation, state }: any) {
 
   return (
     <View className="flex-1 bg-white">
-      {/* 1. Header do Usuário */}
       <View
         style={{ paddingTop: Math.max(insets.top, 20) + 12 }}
         className="pb-6 px-6 bg-gray-50 border-b border-gray-200"
@@ -94,7 +98,6 @@ function CustomDrawerContent({ navigation, state }: any) {
         </View>
       </View>
 
-      {/* 2. Lista de Navegação */}
       <ScrollView className="flex-1 px-3 pt-4" showsVerticalScrollIndicator={false}>
         {rotas.map((item) => {
           const ativo = rotaAtivaNome === item.nome;
@@ -104,7 +107,7 @@ function CustomDrawerContent({ navigation, state }: any) {
               key={item.nome}
               onPress={() => {
                 navigation.closeDrawer();
-                router.push(item.caminho as any);
+                router.push({ pathname: item.caminho as any, params: item.params });
               }}
               className={`flex-row items-center px-4 py-3.5 mb-1.5 rounded-xl ${
                 ativo ? 'bg-green-50' : 'bg-transparent active:bg-gray-100'
@@ -127,7 +130,6 @@ function CustomDrawerContent({ navigation, state }: any) {
         })}
       </ScrollView>
 
-      {/* 3. Rodapé com Botão Sair */}
       <View
         style={{ paddingBottom: Math.max(insets.bottom, 16) + 12 }}
         className="px-4 pt-4 border-t border-gray-200 bg-gray-50"
@@ -152,14 +154,9 @@ export default function AdminLayout() {
         drawerContent={(props) => <CustomDrawerContent {...props} />}
         screenOptions={{
           headerShown: true,
-          headerStyle: {
-            backgroundColor: '#8C6E97',
-          },
+          headerStyle: { backgroundColor: '#8C6E97' },
           headerTintColor: '#FFFFFF',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-            color: '#FFFFFF',
-          },
+          headerTitleStyle: { fontWeight: 'bold', color: '#FFFFFF' },
         }}
       >
         <Drawer.Screen name="index" options={{ title: 'Visão Geral' }} />

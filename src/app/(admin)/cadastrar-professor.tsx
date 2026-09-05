@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
 import { api } from '../../services/api';
 
@@ -34,7 +34,7 @@ const HORARIOS_DISPONIVEIS = [
 export default function CadastrarProfessorScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const modoEdicao = Boolean(id);
+  const modoEdicao = Boolean(id && id !== '');
 
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
@@ -66,46 +66,56 @@ export default function CadastrarProfessorScreen() {
     });
   };
 
-  useEffect(() => {
-    async function carregarProfessor() {
-      if (!id) {
-        limparFormulario();
-        return;
+  // Toda vez que a tela ganha foco, decide se limpa ou carrega os dados
+  useFocusEffect(
+    useCallback(() => {
+      let cancelado = false;
+
+      async function carregar() {
+        if (!id || id === '') {
+          limparFormulario();
+          return;
+        }
+
+        try {
+          setLoadingDados(true);
+          const res = await api.get(`/api/professores/${id}`);
+          if (cancelado) return;
+          const data = res.data;
+
+          setNome(data.nome || '');
+          setEmail(data.email || '');
+          setTelefone(data.telefone || '');
+
+          const novaGrade: Record<string, string[]> = {
+            'Segunda-feira': [],
+            'Terça-feira': [],
+            'Quarta-feira': [],
+            'Quinta-feira': [],
+            'Sexta-feira': [],
+          };
+
+          data.horarios?.forEach((h: { diaSemana: string; slots: string[] }) => {
+            if (novaGrade[h.diaSemana]) {
+              novaGrade[h.diaSemana] = h.slots || [];
+            }
+          });
+
+          setGradeHorarios(novaGrade);
+        } catch (error) {
+          Alert.alert('Erro', 'Não foi possível carregar os dados do professor.');
+        } finally {
+          if (!cancelado) setLoadingDados(false);
+        }
       }
 
-      try {
-        setLoadingDados(true);
-        const res = await api.get(`/api/professores/${id}`);
-        const data = res.data;
+      carregar();
 
-        setNome(data.nome || '');
-        setEmail(data.email || '');
-        setTelefone(data.telefone || '');
-
-        const novaGrade: Record<string, string[]> = {
-          'Segunda-feira': [],
-          'Terça-feira': [],
-          'Quarta-feira': [],
-          'Quinta-feira': [],
-          'Sexta-feira': [],
-        };
-
-        data.horarios?.forEach((h: { diaSemana: string; slots: string[] }) => {
-          if (novaGrade[h.diaSemana]) {
-            novaGrade[h.diaSemana] = h.slots || [];
-          }
-        });
-
-        setGradeHorarios(novaGrade);
-      } catch (error: any) {
-        Alert.alert('Erro', 'Não foi possível carregar os dados do professor.');
-      } finally {
-        setLoadingDados(false);
-      }
-    }
-
-    carregarProfessor();
-  }, [id]);
+      return () => {
+        cancelado = true;
+      };
+    }, [id])
+  );
 
   const toggleHorario = (horario: string) => {
     setGradeHorarios((prev) => {
@@ -190,7 +200,6 @@ export default function CadastrarProfessorScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-50">
-      {/* Define o título dinamicamente de forma segura dentro do layout do Drawer */}
       <Drawer.Screen options={{ title: modoEdicao ? 'Editar Professor' : 'Novo Professor' }} />
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
@@ -199,7 +208,6 @@ export default function CadastrarProfessorScreen() {
           contentContainerStyle={{ paddingBottom: 60 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Dados Básicos */}
           <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
             Dados Básicos
           </Text>
@@ -239,7 +247,6 @@ export default function CadastrarProfessorScreen() {
             </View>
           </View>
 
-          {/* Horário das Aulas */}
           <View className="flex-row items-center justify-between mb-2">
             <Text className="text-xs font-bold text-gray-500 uppercase tracking-wider">
               Horário das Aulas
@@ -252,7 +259,6 @@ export default function CadastrarProfessorScreen() {
           </View>
 
           <View className="bg-white p-4 rounded-2xl border border-gray-200 mb-6">
-            {/* Seletor de Dias */}
             <View className="flex-row justify-between mb-4 bg-gray-100 p-1 rounded-xl">
               {DIAS.map((dia) => {
                 const ativo = diaSelecionado === dia.key;
@@ -274,7 +280,6 @@ export default function CadastrarProfessorScreen() {
               })}
             </View>
 
-            {/* Limpar Dia */}
             <View className="flex-row justify-end mb-3">
               <TouchableOpacity
                 onPress={limparDiaAtual}
@@ -284,7 +289,6 @@ export default function CadastrarProfessorScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Chips de Horários */}
             <View className="flex-row flex-wrap justify-between">
               {HORARIOS_DISPONIVEIS.map((hora) => {
                 const selecionado = slotsDoDia.includes(hora);
@@ -310,7 +314,6 @@ export default function CadastrarProfessorScreen() {
             </View>
           </View>
 
-          {/* Botão Salvar */}
           <TouchableOpacity
             onPress={handleSalvar}
             disabled={loadingSalvar}

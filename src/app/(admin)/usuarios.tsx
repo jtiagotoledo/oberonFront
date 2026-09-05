@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +33,10 @@ export default function GestaoUsuariosScreen() {
   const [professores, setProfessores] = useState<any[]>([]);
   const [alunos, setAlunos] = useState<any[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
+
+  // Estado do Modal de Detalhes
+  const [usuarioDetalhe, setUsuarioDetalhe] = useState<any | null>(null);
+  const [modalDetalheVisivel, setModalDetalheVisivel] = useState(false);
 
   const carregarDadosAba = useCallback(async (aba: AbaTipo, silencioso = false) => {
     try {
@@ -61,7 +67,6 @@ export default function GestaoUsuariosScreen() {
     const unsubscribe = navigation.addListener('focus', () => {
       carregarDadosAba(abaAtiva, true);
     });
-
     return unsubscribe;
   }, [navigation, abaAtiva, carregarDadosAba]);
 
@@ -87,12 +92,17 @@ export default function GestaoUsuariosScreen() {
   };
 
   const handleNovoCadastro = () => {
-    if (abaAtiva === 'professores') router.push('/(admin)/cadastrar-professor');
-    if (abaAtiva === 'alunos') router.push('/(admin)/cadastrar-aluno');
-    if (abaAtiva === 'admins') router.push('/(admin)/cadastrar-admin');
+    if (abaAtiva === 'professores') {
+      router.push({ pathname: '/(admin)/cadastrar-professor', params: { id: '' } });
+    } else if (abaAtiva === 'alunos') {
+      router.push({ pathname: '/(admin)/cadastrar-aluno', params: { id: '' } });
+    } else if (abaAtiva === 'admins') {
+      router.push({ pathname: '/(admin)/cadastrar-admin', params: { id: '' } });
+    }
   };
 
   const handleEditar = (item: any) => {
+    setModalDetalheVisivel(false);
     if (abaAtiva === 'professores') {
       router.push({ pathname: '/(admin)/cadastrar-professor', params: { id: item._id } });
     } else if (abaAtiva === 'alunos') {
@@ -100,6 +110,11 @@ export default function GestaoUsuariosScreen() {
     } else if (abaAtiva === 'admins') {
       router.push({ pathname: '/(admin)/cadastrar-admin', params: { id: item._id } });
     }
+  };
+
+  const handleAbrirDetalhes = (item: any) => {
+    setUsuarioDetalhe(item);
+    setModalDetalheVisivel(true);
   };
 
   const handleExcluir = (item: any) => {
@@ -125,6 +140,7 @@ export default function GestaoUsuariosScreen() {
 
               await api.delete(endpoint);
               Alert.alert('Sucesso', 'Registro excluído com sucesso.');
+              setModalDetalheVisivel(false);
               carregarDadosAba(abaAtiva, true);
             } catch (error: any) {
               const msg = error.response?.data?.erro || 'Erro ao excluir usuário.';
@@ -136,13 +152,22 @@ export default function GestaoUsuariosScreen() {
     );
   };
 
+  const formatarCpf = (cpf?: string) => {
+    if (!cpf) return 'Não informado';
+    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  };
+
   const renderItem = ({ item }: { item: any }) => {
     const ehUsuarioLogado = abaAtiva === 'admins' && item._id === usuarioLogado?.id;
 
     return (
-      <View className="bg-white p-4 rounded-xl border border-gray-200 mb-3 shadow-sm">
-        <View className="flex-row items-center justify-between mb-1">
-          <Text className="text-base font-bold text-gray-800 flex-1 mr-2" numberOfLines={1}>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => handleAbrirDetalhes(item)}
+        className="bg-white p-4 rounded-xl border border-gray-200 mb-3 shadow-sm"
+      >
+        <View className="mb-1">
+          <Text className="text-base font-bold text-gray-800" numberOfLines={1}>
             {item.nome}
           </Text>
         </View>
@@ -181,7 +206,7 @@ export default function GestaoUsuariosScreen() {
               <View className="flex-row items-center">
                 <Ionicons name="card-outline" size={12} color="#A0AEC0" />
                 <Text className="text-[11px] text-gray-400 ml-1">
-                  CPF: {item.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}
+                  CPF: {formatarCpf(item.cpf)}
                 </Text>
               </View>
             )}
@@ -216,7 +241,7 @@ export default function GestaoUsuariosScreen() {
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -224,6 +249,7 @@ export default function GestaoUsuariosScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-50">
+      {/* Barra de Busca */}
       <View className="px-5 pt-4 pb-2 bg-white border-b border-gray-200">
         <View className="flex-row items-center bg-gray-100 px-3 py-2 rounded-xl border border-gray-200 mb-3">
           <Ionicons name="search" size={18} color="#718096" />
@@ -241,17 +267,16 @@ export default function GestaoUsuariosScreen() {
           )}
         </View>
 
+        {/* Abas */}
         <View className="flex-row bg-gray-100 p-1 rounded-xl">
           <TouchableOpacity
             onPress={() => setAbaAtiva('professores')}
-            className={`flex-1 py-2 rounded-lg items-center ${
-              abaAtiva === 'professores' ? 'bg-muv-verde' : 'bg-transparent'
-            }`}
+            className={`flex-1 py-2 rounded-lg items-center ${abaAtiva === 'professores' ? 'bg-muv-verde' : 'bg-transparent'
+              }`}
           >
             <Text
-              className={`text-xs font-bold ${
-                abaAtiva === 'professores' ? 'text-white' : 'text-gray-600'
-              }`}
+              className={`text-xs font-bold ${abaAtiva === 'professores' ? 'text-white' : 'text-gray-600'
+                }`}
             >
               Professores
             </Text>
@@ -259,14 +284,12 @@ export default function GestaoUsuariosScreen() {
 
           <TouchableOpacity
             onPress={() => setAbaAtiva('alunos')}
-            className={`flex-1 py-2 rounded-lg items-center ${
-              abaAtiva === 'alunos' ? 'bg-muv-verde' : 'bg-transparent'
-            }`}
+            className={`flex-1 py-2 rounded-lg items-center ${abaAtiva === 'alunos' ? 'bg-muv-verde' : 'bg-transparent'
+              }`}
           >
             <Text
-              className={`text-xs font-bold ${
-                abaAtiva === 'alunos' ? 'text-white' : 'text-gray-600'
-              }`}
+              className={`text-xs font-bold ${abaAtiva === 'alunos' ? 'text-white' : 'text-gray-600'
+                }`}
             >
               Alunos
             </Text>
@@ -274,14 +297,12 @@ export default function GestaoUsuariosScreen() {
 
           <TouchableOpacity
             onPress={() => setAbaAtiva('admins')}
-            className={`flex-1 py-2 rounded-lg items-center ${
-              abaAtiva === 'admins' ? 'bg-muv-verde' : 'bg-transparent'
-            }`}
+            className={`flex-1 py-2 rounded-lg items-center ${abaAtiva === 'admins' ? 'bg-muv-verde' : 'bg-transparent'
+              }`}
           >
             <Text
-              className={`text-xs font-bold ${
-                abaAtiva === 'admins' ? 'text-white' : 'text-gray-600'
-              }`}
+              className={`text-xs font-bold ${abaAtiva === 'admins' ? 'text-white' : 'text-gray-600'
+                }`}
             >
               Admins
             </Text>
@@ -289,6 +310,7 @@ export default function GestaoUsuariosScreen() {
         </View>
       </View>
 
+      {/* Lista */}
       {carregando && !refreshing ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#63B887" />
@@ -320,6 +342,7 @@ export default function GestaoUsuariosScreen() {
         />
       )}
 
+      {/* Botão Flutuante */}
       <TouchableOpacity
         onPress={handleNovoCadastro}
         activeOpacity={0.85}
@@ -330,6 +353,172 @@ export default function GestaoUsuariosScreen() {
       >
         <Ionicons name="add" size={30} color="#FFFFFF" />
       </TouchableOpacity>
+
+      {/* Modal de Detalhes Completos */}
+      <Modal visible={modalDetalheVisivel} transparent animationType="fade">
+        <View className="flex-1 bg-black/60 justify-center items-center px-4">
+          <View className="bg-white w-full max-h-[85%] rounded-2xl p-5 shadow-2xl">
+            {/* Header Modal */}
+            <View className="flex-row justify-between items-start pb-3 border-b border-gray-100">
+              <View className="flex-1 mr-3">
+                <Text className="text-lg font-bold text-gray-800" numberOfLines={1}>
+                  {usuarioDetalhe?.nome}
+                </Text>
+                <Text className="text-xs text-gray-500">{usuarioDetalhe?.email}</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setModalDetalheVisivel(false)}
+                className="p-1 rounded-full bg-gray-100"
+              >
+                <Ionicons name="close" size={20} color="#4A5568" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Conteúdo com Scroll */}
+            <ScrollView className="py-3" showsVerticalScrollIndicator={false}>
+              <Text className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                Informações de Contato e Registro
+              </Text>
+
+              <View className="bg-gray-50 rounded-xl p-3 mb-4 space-y-2">
+                <View className="flex-row justify-between py-1">
+                  <Text className="text-xs text-gray-500 font-semibold">Telefone:</Text>
+                  <Text className="text-xs text-gray-800 font-medium">
+                    {usuarioDetalhe?.telefone || 'Não informado'}
+                  </Text>
+                </View>
+
+                {abaAtiva === 'alunos' && (
+                  <View className="flex-row justify-between py-1 border-t border-gray-200/50">
+                    <Text className="text-xs text-gray-500 font-semibold">CPF:</Text>
+                    <Text className="text-xs text-gray-800 font-medium">
+                      {formatarCpf(usuarioDetalhe?.cpf)}
+                    </Text>
+                  </View>
+                )}
+
+                {usuarioDetalhe?.endereco && (
+                  <View className="flex-row justify-between py-1 border-t border-gray-200/50">
+                    <Text className="text-xs text-gray-500 font-semibold">Endereço:</Text>
+                    <Text className="text-xs text-gray-800 font-medium">
+                      {usuarioDetalhe?.endereco}
+                    </Text>
+                  </View>
+                )}
+
+                {usuarioDetalhe?.cidade && (
+                  <View className="flex-row justify-between py-1 border-t border-gray-200/50">
+                    <Text className="text-xs text-gray-500 font-semibold">Cidade:</Text>
+                    <Text className="text-xs text-gray-800 font-medium">
+                      {usuarioDetalhe?.cidade}
+                    </Text>
+                  </View>
+                )}
+
+                <View className="flex-row justify-between py-1 border-t border-gray-200/50">
+                  <Text className="text-xs text-gray-500 font-semibold">Status Acesso:</Text>
+                  <Text
+                    className={`text-xs font-bold ${usuarioDetalhe?.primeiroAcesso ? 'text-amber-600' : 'text-muv-verde'
+                      }`}
+                  >
+                    {usuarioDetalhe?.primeiroAcesso ? '1º Acesso Pendente' : 'Ativo'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Informações Específicas do Aluno */}
+              {abaAtiva === 'alunos' && (
+                <>
+                  <Text className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                    Plano e Instrutor
+                  </Text>
+                  <View className="bg-gray-50 rounded-xl p-3 mb-4 space-y-2">
+                    <View className="flex-row justify-between py-1">
+                      <Text className="text-xs text-gray-500 font-semibold">Professor:</Text>
+                      <Text className="text-xs text-gray-800 font-bold">
+                        {usuarioDetalhe?.professor?.nome || 'Não atribuído'}
+                      </Text>
+                    </View>
+                    <View className="flex-row justify-between py-1 border-t border-gray-200/50">
+                      <Text className="text-xs text-gray-500 font-semibold">Aulas Semanais:</Text>
+                      <Text className="text-xs text-gray-800 font-bold">
+                        {usuarioDetalhe?.aulasSemanais ? `${usuarioDetalhe.aulasSemanais}x na semana` : 'Não definido'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                    Aulas Agendadas
+                  </Text>
+                  {usuarioDetalhe?.horariosAula?.length > 0 ? (
+                    usuarioDetalhe.horariosAula.map((aula: any, idx: number) => (
+                      <View
+                        key={idx}
+                        className="flex-row justify-between items-center bg-green-50 border border-green-200 rounded-xl p-3 mb-2"
+                      >
+                        <View className="flex-row items-center">
+                          <Ionicons name="calendar" size={14} color="#63B887" />
+                          <Text className="text-xs font-bold text-gray-700 ml-2">
+                            {aula.diaSemana}
+                          </Text>
+                        </View>
+                        <Text className="text-xs font-bold text-muv-verde">{aula.horario}</Text>
+                      </View>
+                    ))
+                  ) : (
+                    <Text className="text-xs text-gray-400 italic mb-3">Nenhum horário registrado.</Text>
+                  )}
+                </>
+              )}
+
+              {/* Informações Específicas do Professor */}
+              {abaAtiva === 'professores' && (
+                <>
+                  <Text className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                    Grade de Atendimento
+                  </Text>
+                  {usuarioDetalhe?.horarios?.length > 0 ? (
+                    usuarioDetalhe.horarios.map((h: any, idx: number) => (
+                      <View key={idx} className="bg-gray-50 rounded-xl p-3 mb-2 border border-gray-100">
+                        <Text className="text-xs font-bold text-gray-700 mb-2">{h.diaSemana}</Text>
+                        <View className="flex-row flex-wrap">
+                          {h.slots?.map((slot: string, sIdx: number) => (
+                            <View
+                              key={sIdx}
+                              className="bg-green-50 border border-green-200 px-2.5 py-1 rounded-md mr-1.5 mb-1.5"
+                            >
+                              <Text className="text-[11px] font-bold text-muv-verde">{slot}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    ))
+                  ) : (
+                    <Text className="text-xs text-gray-400 italic mb-3">Nenhum horário cadastrado.</Text>
+                  )}
+                </>
+              )}
+            </ScrollView>
+
+            {/* Rodapé do Modal */}
+            <View className="flex-row justify-end items-center pt-3 border-t border-gray-100 mt-2">
+              <TouchableOpacity
+                onPress={() => handleEditar(usuarioDetalhe)}
+                className="flex-row items-center px-4 py-2.5 rounded-xl bg-muv-verde active:opacity-90 mr-2"
+              >
+                <Ionicons name="pencil-outline" size={14} color="#FFFFFF" />
+                <Text className="text-xs font-bold text-white ml-1.5">Editar Dados</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setModalDetalheVisivel(false)}
+                className="px-4 py-2.5 rounded-xl bg-gray-100 active:bg-gray-200"
+              >
+                <Text className="text-xs font-bold text-gray-600">Fechar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

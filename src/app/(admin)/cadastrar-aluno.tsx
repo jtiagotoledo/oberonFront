@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import {
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { Drawer } from 'expo-router/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../services/api';
 
@@ -34,9 +35,8 @@ interface AulaSelecionada {
 
 export default function CadastrarAlunoScreen() {
   const router = useRouter();
-  const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const modoEdicao = Boolean(id);
+  const modoEdicao = Boolean(id && id !== '');
 
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
@@ -63,14 +63,6 @@ export default function CadastrarAlunoScreen() {
   const [modalHoraVisible, setModalHoraVisible] = useState(false);
   const [indexAulaEditando, setIndexAulaEditando] = useState<number>(0);
 
-  // Altera o título do cabeçalho conforme o modo
-  useEffect(() => {
-    navigation.setOptions({
-      title: modoEdicao ? 'Editar Aluno' : 'Novo Aluno',
-    });
-  }, [navigation, modoEdicao]);
-
-  // Função para limpar os campos quando entrar em modo novo cadastro
   const limparFormulario = () => {
     setNome('');
     setEmail('');
@@ -98,17 +90,27 @@ export default function CadastrarAlunoScreen() {
     setCpf(formatarCpf(texto));
   };
 
-  useEffect(() => {
-    async function carregarDados() {
-      try {
-        setCarregandoProfessores(true);
-        const resProf = await api.get('/api/professores');
-        const listaProfessores: Professor[] = resProf.data;
-        setProfessores(listaProfessores);
+  // Toda vez que a tela ganhar foco, decide se limpa ou carrega o registro selecionado
+  useFocusEffect(
+    useCallback(() => {
+      let cancelado = false;
 
-        if (id) {
+      async function carregar() {
+        try {
+          setCarregandoProfessores(true);
+          const resProf = await api.get('/api/professores');
+          if (cancelado) return;
+          const listaProf: Professor[] = resProf.data;
+          setProfessores(listaProf);
+
+          if (!id || id === '') {
+            limparFormulario();
+            return;
+          }
+
           setLoadingDados(true);
           const resAluno = await api.get(`/api/alunos/${id}`);
+          if (cancelado) return;
           const data = resAluno.data;
 
           setNome(data.nome || '');
@@ -118,30 +120,37 @@ export default function CadastrarAlunoScreen() {
           setEndereco(data.endereco || '');
           setCidade(data.cidade || '');
           setQtdAulas(data.aulasSemanais || 2);
-          setAulas(data.horariosAula && data.horariosAula.length > 0 ? data.horariosAula : [
-            { diaSemana: '', horario: '' },
-            { diaSemana: '', horario: '' },
-          ]);
+          setAulas(
+            data.horariosAula && data.horariosAula.length > 0
+              ? data.horariosAula
+              : [
+                  { diaSemana: '', horario: '' },
+                  { diaSemana: '', horario: '' },
+                ]
+          );
 
           const profId = typeof data.professor === 'object' ? data.professor?._id : data.professor;
-          const profEncontrado = listaProfessores.find((p) => p._id === profId);
+          const profEncontrado = listaProf.find((p) => p._id === profId);
           if (profEncontrado) {
             setProfessorSelecionado(profEncontrado);
           }
-        } else {
-          limparFormulario();
+        } catch (error) {
+          Alert.alert('Erro', 'Não foi possível carregar os dados.');
+        } finally {
+          if (!cancelado) {
+            setCarregandoProfessores(false);
+            setLoadingDados(false);
+          }
         }
-      } catch (error: any) {
-        console.error('Erro ao carregar dados:', error.response?.data || error.message);
-        Alert.alert('Erro', 'Não foi possível carregar os dados do aluno.');
-      } finally {
-        setCarregandoProfessores(false);
-        setLoadingDados(false);
       }
-    }
 
-    carregarDados();
-  }, [id]);
+      carregar();
+
+      return () => {
+        cancelado = true;
+      };
+    }, [id])
+  );
 
   const alterarQuantidadeAulas = (novaQtd: number) => {
     setQtdAulas(novaQtd);
@@ -239,6 +248,8 @@ export default function CadastrarAlunoScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-50">
+      <Drawer.Screen options={{ title: modoEdicao ? 'Editar Aluno' : 'Novo Aluno' }} />
+
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
         <ScrollView
           className="flex-1 px-6 pt-4"
@@ -408,7 +419,6 @@ export default function CadastrarAlunoScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* MODAL: SELEÇÃO DE PROFESSOR */}
       <Modal visible={modalProfVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
           <View className="bg-white w-full max-w-sm rounded-xl p-5">
@@ -438,7 +448,6 @@ export default function CadastrarAlunoScreen() {
         </View>
       </Modal>
 
-      {/* MODAL: SELEÇÃO DE DIA */}
       <Modal visible={modalDiaVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
           <View className="bg-white w-full max-w-sm rounded-xl p-5">
@@ -463,7 +472,6 @@ export default function CadastrarAlunoScreen() {
         </View>
       </Modal>
 
-      {/* MODAL: SELEÇÃO DE HORÁRIO */}
       <Modal visible={modalHoraVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
           <View className="bg-white w-full max-w-sm rounded-xl p-5">

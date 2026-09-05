@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,14 +11,14 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { Drawer } from 'expo-router/drawer';
 import { api } from '../../services/api';
 
 export default function CadastrarAdminScreen() {
   const router = useRouter();
-  const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const modoEdicao = Boolean(id);
+  const modoEdicao = Boolean(id && id !== '');
 
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
@@ -27,33 +27,45 @@ export default function CadastrarAdminScreen() {
   const [loadingDados, setLoadingDados] = useState(false);
   const [loadingSalvar, setLoadingSalvar] = useState(false);
 
-  useEffect(() => {
-    navigation.setOptions({
-      title: modoEdicao ? 'Editar Administrador' : 'Novo Administrador',
-    });
-  }, [navigation, modoEdicao]);
-
-  useEffect(() => {
-    if (id) {
-      carregarAdmin();
-    }
-  }, [id]);
-
-  const carregarAdmin = async () => {
-    try {
-      setLoadingDados(true);
-      const res = await api.get(`/api/admins/${id}`);
-      const data = res.data;
-
-      setNome(data.nome || '');
-      setEmail(data.email || '');
-      setTelefone(data.telefone || '');
-    } catch (error) {
-      Alert.alert('Erro', 'Não foi possível carregar os dados do administrador.');
-    } finally {
-      setLoadingDados(false);
-    }
+  const limparFormulario = () => {
+    setNome('');
+    setEmail('');
+    setTelefone('');
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelado = false;
+
+      async function carregar() {
+        if (!id || id === '') {
+          limparFormulario();
+          return;
+        }
+
+        try {
+          setLoadingDados(true);
+          const res = await api.get(`/api/admins/${id}`);
+          if (cancelado) return;
+          const data = res.data;
+
+          setNome(data.nome || '');
+          setEmail(data.email || '');
+          setTelefone(data.telefone || '');
+        } catch (error) {
+          Alert.alert('Erro', 'Não foi possível carregar os dados do administrador.');
+        } finally {
+          if (!cancelado) setLoadingDados(false);
+        }
+      }
+
+      carregar();
+
+      return () => {
+        cancelado = true;
+      };
+    }, [id])
+  );
 
   const handleSalvar = async () => {
     if (!nome.trim() || !email.trim()) {
@@ -99,6 +111,8 @@ export default function CadastrarAdminScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-50">
+      <Drawer.Screen options={{ title: modoEdicao ? 'Editar Administrador' : 'Novo Administrador' }} />
+
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
         <ScrollView
           className="flex-1 px-6 pt-4"
