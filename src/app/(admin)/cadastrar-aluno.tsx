@@ -17,6 +17,18 @@ import { Drawer } from 'expo-router/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../services/api';
 
+interface SlotOcupacao {
+  horario: string;
+  matriculados: number;
+  limite: number;
+  lotado: boolean;
+}
+
+interface DiaOcupacao {
+  diaSemana: string;
+  slots: SlotOcupacao[];
+}
+
 interface HorarioProfessor {
   diaSemana: 'Segunda-feira' | 'Terça-feira' | 'Quarta-feira' | 'Quinta-feira' | 'Sexta-feira';
   slots: string[];
@@ -49,6 +61,10 @@ export default function CadastrarAlunoScreen() {
   const [professorSelecionado, setProfessorSelecionado] = useState<Professor | null>(null);
   const [carregandoProfessores, setCarregandoProfessores] = useState(false);
 
+  // Mapa de ocupação real de cada dia e slot do professor selecionado
+  const [ocupacaoProfessor, setOcupacaoProfessor] = useState<DiaOcupacao[]>([]);
+  const [carregandoOcupacao, setCarregandoOcupacao] = useState(false);
+
   const [qtdAulas, setQtdAulas] = useState(2);
   const [aulas, setAulas] = useState<AulaSelecionada[]>([
     { diaSemana: '', horario: '' },
@@ -71,6 +87,7 @@ export default function CadastrarAlunoScreen() {
     setEndereco('');
     setCidade('');
     setProfessorSelecionado(null);
+    setOcupacaoProfessor([]);
     setQtdAulas(2);
     setAulas([
       { diaSemana: '', horario: '' },
@@ -90,7 +107,19 @@ export default function CadastrarAlunoScreen() {
     setCpf(formatarCpf(texto));
   };
 
-  // Toda vez que a tela ganhar foco, decide se limpa ou carrega o registro selecionado
+  const carregarOcupacao = async (profId: string) => {
+    try {
+      setCarregandoOcupacao(true);
+      const res = await api.get(`/api/professores/${profId}/ocupacao`);
+      setOcupacaoProfessor(res.data.ocupacao || []);
+    } catch (err) {
+      console.warn('Erro ao obter ocupação:', err);
+      setOcupacaoProfessor([]);
+    } finally {
+      setCarregandoOcupacao(false);
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       let cancelado = false;
@@ -133,8 +162,9 @@ export default function CadastrarAlunoScreen() {
           const profEncontrado = listaProf.find((p) => p._id === profId);
           if (profEncontrado) {
             setProfessorSelecionado(profEncontrado);
+            await carregarOcupacao(profEncontrado._id);
           }
-        } catch (error) {
+        } catch {
           Alert.alert('Erro', 'Não foi possível carregar os dados.');
         } finally {
           if (!cancelado) {
@@ -151,6 +181,13 @@ export default function CadastrarAlunoScreen() {
       };
     }, [id])
   );
+
+  const selecionarProfessor = (prof: Professor) => {
+    setProfessorSelecionado(prof);
+    setAulas(aulas.map(() => ({ diaSemana: '', horario: '' })));
+    setModalProfVisible(false);
+    carregarOcupacao(prof._id);
+  };
 
   const alterarQuantidadeAulas = (novaQtd: number) => {
     setQtdAulas(novaQtd);
@@ -179,10 +216,24 @@ export default function CadastrarAlunoScreen() {
     });
   };
 
-  const getSlotsDisponiveis = (dia: string) => {
-    if (!professorSelecionado) return [];
-    const diaEncontrado = professorSelecionado.horarios?.find((h) => h.diaSemana === dia);
-    return diaEncontrado ? diaEncontrado.slots : [];
+  // Retorna slots enriquecidos com status de vagas
+  const getSlotsComStatus = (dia: string): SlotOcupacao[] => {
+    if (!dia || !professorSelecionado) return [];
+
+    const diaEncontrado = ocupacaoProfessor.find((d) => d.diaSemana === dia);
+    if (diaEncontrado && diaEncontrado.slots) {
+      return diaEncontrado.slots;
+    }
+
+    const diaBase = professorSelecionado.horarios?.find((h) => h.diaSemana === dia);
+    if (!diaBase) return [];
+
+    return diaBase.slots.map((s) => ({
+      horario: s,
+      matriculados: 0,
+      limite: 4,
+      lotado: false,
+    }));
   };
 
   const handleSalvar = async () => {
@@ -245,6 +296,9 @@ export default function CadastrarAlunoScreen() {
       </View>
     );
   }
+
+  const diaDaAulaAtual = aulas[indexAulaEditando]?.diaSemana || '';
+  const slotsDaGrade = getSlotsComStatus(diaDaAulaAtual);
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-50">
@@ -419,6 +473,7 @@ export default function CadastrarAlunoScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
+      {/* MODAL: SELEÇÃO DE PROFESSOR */}
       <Modal visible={modalProfVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
           <View className="bg-white w-full max-w-sm rounded-xl p-5">
@@ -429,11 +484,7 @@ export default function CadastrarAlunoScreen() {
               professores.map((prof) => (
                 <TouchableOpacity
                   key={prof._id}
-                  onPress={() => {
-                    setProfessorSelecionado(prof);
-                    setAulas(aulas.map(() => ({ diaSemana: '', horario: '' })));
-                    setModalProfVisible(false);
-                  }}
+                  onPress={() => selecionarProfessor(prof)}
                   className="py-3 border-b border-gray-100 flex-row justify-between items-center"
                 >
                   <Text className="text-sm font-medium text-gray-700">{prof.nome}</Text>
@@ -448,6 +499,7 @@ export default function CadastrarAlunoScreen() {
         </View>
       </Modal>
 
+      {/* MODAL: SELEÇÃO DE DIA */}
       <Modal visible={modalDiaVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
           <View className="bg-white w-full max-w-sm rounded-xl p-5">
@@ -472,26 +524,90 @@ export default function CadastrarAlunoScreen() {
         </View>
       </Modal>
 
+      {/* MODAL: SELEÇÃO DE HORÁRIO COM FEEDBACK VISUAL DE VAGAS */}
       <Modal visible={modalHoraVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
-          <View className="bg-white w-full max-w-sm rounded-xl p-5">
-            <Text className="text-base font-bold text-gray-800 mb-3">Horários Disponíveis</Text>
-            <View className="flex-row flex-wrap justify-between">
-              {getSlotsDisponiveis(aulas[indexAulaEditando]?.diaSemana).map((slot) => (
-                <TouchableOpacity
-                  key={slot}
-                  onPress={() => {
-                    atualizarAula(indexAulaEditando, 'horario', slot);
-                    setModalHoraVisible(false);
-                  }}
-                  className="w-[30%] py-2.5 mb-2 rounded-lg border border-gray-200 items-center justify-center bg-gray-50"
-                >
-                  <Text className="text-xs font-semibold text-gray-700">{slot}</Text>
-                </TouchableOpacity>
-              ))}
+          <View className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl">
+            <View className="flex-row justify-between items-center mb-3">
+              <Text className="text-base font-bold text-gray-800">Horários Disponíveis</Text>
+              {carregandoOcupacao && <ActivityIndicator size="small" color="#63B887" />}
             </View>
-            <TouchableOpacity onPress={() => setModalHoraVisible(false)} className="mt-3 items-center">
-              <Text className="text-gray-500 font-semibold text-xs">Fechar</Text>
+
+            <View className="flex-row flex-wrap justify-between">
+              {slotsDaGrade.map((slotInfo) => {
+                const jaPertenceAoAluno =
+                  modoEdicao &&
+                  aulas.some(
+                    (a) => a.diaSemana === diaDaAulaAtual && a.horario === slotInfo.horario
+                  );
+
+                const estaLotado = slotInfo.lotado && !jaPertenceAoAluno;
+                const estaSelecionado = aulas[indexAulaEditando]?.horario === slotInfo.horario;
+
+                return (
+                  <TouchableOpacity
+                    key={slotInfo.horario}
+                    disabled={estaLotado}
+                    onPress={() => {
+                      atualizarAula(indexAulaEditando, 'horario', slotInfo.horario);
+                      setModalHoraVisible(false);
+                    }}
+                    style={{
+                      backgroundColor: estaLotado ? '#F3F4F6' : estaSelecionado ? '#63B887' : '#FFFFFF',
+                      borderColor: estaLotado ? '#E5E7EB' : estaSelecionado ? '#63B887' : '#E2E8F0',
+                      opacity: estaLotado ? 0.6 : 1,
+                    }}
+                    className="w-[48%] py-3 px-2 mb-2.5 rounded-xl border items-center justify-center"
+                  >
+                    <Text
+                      style={{
+                        color: estaLotado ? '#9CA3AF' : estaSelecionado ? '#FFFFFF' : '#1F2937',
+                        fontWeight: 'bold',
+                        fontSize: 14,
+                      }}
+                    >
+                      {slotInfo.horario}
+                    </Text>
+
+                    <View
+                      style={{
+                        marginTop: 4,
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 6,
+                        backgroundColor: estaLotado
+                          ? '#FEE2E2'
+                          : estaSelecionado
+                          ? 'rgba(255,255,255,0.25)'
+                          : '#ECFDF5',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: '700',
+                          color: estaLotado
+                            ? '#DC2626'
+                            : estaSelecionado
+                            ? '#FFFFFF'
+                            : '#059669',
+                        }}
+                      >
+                        {estaLotado
+                          ? 'Lotado'
+                          : `${slotInfo.matriculados}/${slotInfo.limite} vagas`}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setModalHoraVisible(false)}
+              className="mt-3 items-center py-2.5 bg-gray-100 rounded-xl"
+            >
+              <Text className="text-gray-600 font-bold text-xs">Fechar</Text>
             </TouchableOpacity>
           </View>
         </View>

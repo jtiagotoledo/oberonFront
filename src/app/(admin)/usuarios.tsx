@@ -38,24 +38,6 @@ export default function GestaoUsuariosScreen() {
   const [usuarioDetalhe, setUsuarioDetalhe] = useState<any | null>(null);
   const [modalDetalheVisivel, setModalDetalheVisivel] = useState(false);
 
-  // Configuração do Limite Dinâmico de Alunos por Horário
-  const [limiteConfig, setLimiteConfig] = useState(4);
-  const [novoLimiteInput, setNovoLimiteInput] = useState('4');
-  const [modalConfigVisivel, setModalConfigVisivel] = useState(false);
-  const [salvandoConfig, setSalvandoConfig] = useState(false);
-
-  const carregarConfigLimite = async () => {
-    try {
-      const res = await api.get('/api/configuracoes/limite-alunos');
-      if (res.data?.limite) {
-        setLimiteConfig(res.data.limite);
-        setNovoLimiteInput(String(res.data.limite));
-      }
-    } catch {
-      // Caso não consiga consultar, mantém o fallback em 4
-    }
-  };
-
   const carregarDadosAba = useCallback(async (aba: AbaTipo, silencioso = false) => {
     try {
       if (!silencioso) setCarregando(true);
@@ -78,13 +60,11 @@ export default function GestaoUsuariosScreen() {
   }, []);
 
   useEffect(() => {
-    carregarConfigLimite();
     carregarDadosAba(abaAtiva);
   }, [abaAtiva, carregarDadosAba]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      carregarConfigLimite();
       carregarDadosAba(abaAtiva, true);
     });
     return unsubscribe;
@@ -92,29 +72,7 @@ export default function GestaoUsuariosScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    carregarConfigLimite();
     carregarDadosAba(abaAtiva, true);
-  };
-
-  const handleSalvarLimite = async () => {
-    const num = parseInt(novoLimiteInput, 10);
-    if (isNaN(num) || num < 1 || num > 50) {
-      Alert.alert('Valor inválido', 'Digite um número entre 1 e 50.');
-      return;
-    }
-
-    try {
-      setSalvandoConfig(true);
-      const res = await api.put('/api/configuracoes/limite-alunos', { limite: num });
-      setLimiteConfig(res.data.limite);
-      setModalConfigVisivel(false);
-      Alert.alert('Sucesso', `Limite de ${res.data.limite} alunos por horário salvo com sucesso!`);
-    } catch (error: any) {
-      const msg = error.response?.data?.erro || 'Erro ao atualizar limite.';
-      Alert.alert('Erro', msg);
-    } finally {
-      setSalvandoConfig(false);
-    }
   };
 
   const listaAtual = () => {
@@ -291,36 +249,22 @@ export default function GestaoUsuariosScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-50">
-      {/* Topo com Barra de Busca e Botão de Configuração de Limite */}
+      {/* Barra de Busca Limpa */}
       <View className="px-5 pt-4 pb-2 bg-white border-b border-gray-200">
-        <View className="flex-row items-center mb-3">
-          <View className="flex-1 flex-row items-center bg-gray-100 px-3 py-2 rounded-xl border border-gray-200">
-            <Ionicons name="search" size={18} color="#718096" />
-            <TextInput
-              placeholder={`Buscar por nome, e-mail${abaAtiva === 'alunos' ? ' ou CPF' : ''}...`}
-              value={busca}
-              onChangeText={setBusca}
-              className="flex-1 ml-2 text-sm text-gray-800"
-              autoCapitalize="none"
-            />
-            {busca.length > 0 && (
-              <TouchableOpacity onPress={() => setBusca('')}>
-                <Ionicons name="close-circle" size={16} color="#A0AEC0" />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Botão de Ajuste de Capacidade Global */}
-          <TouchableOpacity
-            onPress={() => {
-              setNovoLimiteInput(String(limiteConfig));
-              setModalConfigVisivel(true);
-            }}
-            className="ml-2 px-3 py-2.5 bg-gray-100 border border-gray-200 rounded-xl items-center justify-center flex-row"
-          >
-            <Ionicons name="settings-outline" size={18} color="#4A5568" />
-            <Text className="text-xs font-bold text-gray-700 ml-1.5">{limiteConfig}/h</Text>
-          </TouchableOpacity>
+        <View className="flex-row items-center bg-gray-100 px-3 py-2 rounded-xl border border-gray-200 mb-3">
+          <Ionicons name="search" size={18} color="#718096" />
+          <TextInput
+            placeholder={`Buscar por nome, e-mail${abaAtiva === 'alunos' ? ' ou CPF' : ''}...`}
+            value={busca}
+            onChangeText={setBusca}
+            className="flex-1 ml-2 text-sm text-gray-800"
+            autoCapitalize="none"
+          />
+          {busca.length > 0 && (
+            <TouchableOpacity onPress={() => setBusca('')}>
+              <Ionicons name="close-circle" size={16} color="#A0AEC0" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Abas */}
@@ -372,7 +316,7 @@ export default function GestaoUsuariosScreen() {
         </View>
       </View>
 
-      {/* Lista Principal */}
+      {/* Lista */}
       {carregando && !refreshing ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#63B887" />
@@ -404,7 +348,7 @@ export default function GestaoUsuariosScreen() {
         />
       )}
 
-      {/* Botão Flutuante (Novo Usuário) */}
+      {/* Botão Flutuante (Novo Cadastro) */}
       <TouchableOpacity
         onPress={handleNovoCadastro}
         activeOpacity={0.85}
@@ -416,7 +360,7 @@ export default function GestaoUsuariosScreen() {
         <Ionicons name="add" size={30} color="#FFFFFF" />
       </TouchableOpacity>
 
-      {/* Modal: Detalhes do Usuário */}
+      {/* Modal de Detalhes do Usuário */}
       <Modal visible={modalDetalheVisivel} transparent animationType="fade">
         <View className="flex-1 bg-black/60 justify-center items-center px-4">
           <View className="bg-white w-full max-h-[85%] rounded-2xl p-5 shadow-2xl">
@@ -561,51 +505,6 @@ export default function GestaoUsuariosScreen() {
                 className="px-4 py-2.5 rounded-xl bg-gray-100 active:bg-gray-200"
               >
                 <Text className="text-xs font-bold text-gray-600">Fechar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Modal: Configuração da Capacidade Máxima por Horário */}
-      <Modal visible={modalConfigVisivel} transparent animationType="fade">
-        <View className="flex-1 bg-black/60 justify-center items-center px-6">
-          <View className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl">
-            <View className="flex-row items-center mb-1">
-              <Ionicons name="options-outline" size={20} color="#63B887" />
-              <Text className="text-base font-bold text-gray-800 ml-2">Capacidade por Horário</Text>
-            </View>
-            <Text className="text-xs text-gray-500 mb-4 leading-relaxed">
-              Defina o número máximo de alunos que qualquer professor pode atender simultaneamente no mesmo slot de aula.
-            </Text>
-
-            <Text className="text-xs font-semibold text-gray-600 mb-1">LIMITE GLOBAL DE ALUNOS</Text>
-            <TextInput
-              value={novoLimiteInput}
-              onChangeText={setNovoLimiteInput}
-              keyboardType="numeric"
-              maxLength={2}
-              className="border border-gray-300 rounded-xl px-3 py-3 text-center text-xl font-bold text-gray-800 bg-gray-50 mb-4"
-            />
-
-            <View className="flex-row justify-end space-x-2">
-              <TouchableOpacity
-                onPress={() => setModalConfigVisivel(false)}
-                className="px-4 py-2.5 rounded-xl bg-gray-100 active:bg-gray-200 mr-2"
-              >
-                <Text className="text-xs font-bold text-gray-600">Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleSalvarLimite}
-                disabled={salvandoConfig}
-                className="px-5 py-2.5 rounded-xl bg-muv-verde active:opacity-90 flex-row items-center"
-              >
-                {salvandoConfig ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text className="text-xs font-bold text-white">Salvar Regra</Text>
-                )}
               </TouchableOpacity>
             </View>
           </View>
