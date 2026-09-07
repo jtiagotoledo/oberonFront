@@ -1,15 +1,12 @@
 import React from 'react';
 import { View, Text, FlatList, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore } from '../../store/useAuthStore';
-import { useRouter, Href } from 'expo-router';
 
-// Função para gerar dinamicamente as próximas 4 semanas
 const gerarProximasSemanas = () => {
   const semanas = [];
   let dataAtual = new Date();
   
-  // Retrocede para a última segunda-feira
   const diaDaSemana = dataAtual.getDay();
   const diff = dataAtual.getDate() - diaDaSemana + (diaDaSemana === 0 ? -6 : 1);
   dataAtual.setDate(diff);
@@ -26,27 +23,18 @@ const gerarProximasSemanas = () => {
       titulo: `Semana de ${formataData(dataAtual)} a ${formataData(sexta)}`
     });
 
-    dataAtual.setDate(dataAtual.getDate() + 7); // Avança 7 dias
+    dataAtual.setDate(dataAtual.getDate() + 7);
   }
   return semanas;
 };
 
 export default function ProfessorHome() {
   const router = useRouter();
-  const logout = useAuthStore((s) => s.logout);
   const semanas = gerarProximasSemanas();
 
   return (
     <View className="flex-1 bg-gray-50 p-5">
-      <View className="flex-row justify-between items-center mb-6 mt-2">
-        <Text className="text-2xl font-bold text-gray-800">Próximas Semanas</Text>
-        <TouchableOpacity 
-          onPress={() => { logout(); router.replace('/'); }} 
-          className="p-2 bg-red-50 rounded-full active:bg-red-100"
-        >
-          <Ionicons name="log-out-outline" size={22} color="#EF4444" />
-        </TouchableOpacity>
-      </View>
+      <Text className="text-xl font-bold text-gray-800 mb-5 mt-2">Próximas Semanas</Text>
       
       <FlatList
         data={semanas}
@@ -55,7 +43,7 @@ export default function ProfessorHome() {
         renderItem={({ item }) => (
           <TouchableOpacity
             className="bg-white p-5 rounded-2xl mb-4 shadow-sm border border-gray-200 active:bg-gray-100 flex-row justify-between items-center"
-            onPress={() => router.push(`/(professor)/semana/${item.id}` as Href)}
+            onPress={() => router.push({ pathname: '/(professor)/semana/[id]', params: { id: item.id } })}
           >
             <View>
               <Text className="text-lg font-bold text-gray-700">{item.titulo}</Text>
