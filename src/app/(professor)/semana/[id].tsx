@@ -69,7 +69,7 @@ export default function SemanaDetalhes() {
                   <Text className={`font-bold ${isSelected ? 'text-white' : 'text-gray-600'}`}>
                     {dia.diaNome}
                   </Text>
-                  {/* Bolinha indicadora se há aulas no dia (escondida se estiver selecionado para visual mais limpo) */}
+                  {/* Bolinha indicadora se há aulas no dia (escondida se estiver selecionado) */}
                   {temAula && !isSelected && (
                     <View className="w-1.5 h-1.5 rounded-full bg-muv-verde ml-1.5" />
                   )}
@@ -102,14 +102,35 @@ export default function SemanaDetalhes() {
 
                 {/* Lista de Alunos */}
                 {item.alunos.length > 0 ? (
-                  item.alunos.map((aluno: any) => (
-                    <View key={aluno.id} className="flex-row items-center py-2">
-                      <Ionicons name="person-circle-outline" size={24} color="#A0AEC0" />
-                      <Text className="text-gray-700 font-medium text-base ml-2">{aluno.nome}</Text>
+                  item.alunos.map((aluno: any, index: number) => (
+                    <View 
+                      key={aluno.id} 
+                      className={`flex-row items-center py-3 ${
+                        index !== item.alunos.length - 1 ? 'border-b border-gray-50' : ''
+                      }`}
+                    >
+                      <Ionicons name="person-circle-outline" size={36} color="#CBD5E0" />
+                      <View className="ml-3 flex-1">
+                        <Text className="text-gray-700 font-bold text-base">{aluno.nome}</Text>
+                        
+                        {/* Exibição do Telefone */}
+                        {aluno.telefone ? (
+                          <View className="flex-row items-center mt-0.5">
+                            <Ionicons name="logo-whatsapp" size={14} color="#63B887" />
+                            <Text className="text-gray-500 font-medium text-xs ml-1.5">
+                              {aluno.telefone}
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text className="text-gray-400 text-xs mt-0.5 italic">
+                            Sem telefone cadastrado
+                          </Text>
+                        )}
+                      </View>
                     </View>
                   ))
                 ) : (
-                  <Text className="text-gray-400 italic text-sm py-1 ml-1">Horário vago.</Text>
+                  <Text className="text-gray-400 italic text-sm py-2 ml-1">Horário vago.</Text>
                 )}
                 
               </View>
