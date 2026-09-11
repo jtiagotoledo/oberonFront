@@ -153,20 +153,23 @@ export default function ReagendarScreen() {
     try {
       setLoadingSalvar(true);
       
-      const resAluno = await api.get(`/api/alunos/${user?.id}`);
-      const alunoAtual = resAluno.data;
-      
-      const diaTextoNovo = DIAS_POR_INDEX[dataNova.getDay()];
-      const novaGrade = alunoAtual.horariosAula.map((aula: any) => {
-        if (aula.diaSemana === aulaOrigem.diaSemana && aula.horario === aulaOrigem.horario) {
-          return { diaSemana: diaTextoNovo, horario: horarioNovo.horario };
-        }
-        return aula;
-      });
+      // Função auxiliar para formatar a data no padrão YYYY-MM-DD sem problema de fuso horário
+      const formataYMD = (d: Date) => {
+        const dataAjustada = new Date(d);
+        dataAjustada.setMinutes(dataAjustada.getMinutes() - dataAjustada.getTimezoneOffset());
+        return dataAjustada.toISOString().split('T')[0];
+      };
 
-      await api.put(`/api/alunos/${user?.id}`, {
-        professor: professorSel._id,
-        horariosAula: novaGrade
+      const dataOrigemFormatada = formataYMD(aulaOrigem.dataCompleta);
+      const dataNovaFormatada = formataYMD(dataNova);
+
+      // Chama a nova rota de reagendamento pontual
+      await api.post(`/api/alunos/${user?.id}/reagendar`, {
+        dataOrigem: dataOrigemFormatada,
+        horarioOrigem: aulaOrigem.horario,
+        dataNova: dataNovaFormatada,
+        horarioNovo: horarioNovo.horario,
+        professor: professorSel._id
       });
 
       Alert.alert(
