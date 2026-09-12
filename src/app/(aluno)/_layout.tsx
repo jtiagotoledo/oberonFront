@@ -38,6 +38,12 @@ function CustomDrawerContent({ navigation, state }: any) {
       icone: 'swap-horizontal-outline' as const,
       caminho: '/(aluno)/reagendar',
     },
+    {
+      nome: 'alterar-senha',
+      titulo: 'Alterar Senha',
+      icone: 'key-outline' as const,
+      caminho: '/(aluno)/alterar-senha',
+    },
   ];
 
   const rotaAtivaNome = state?.routes[state.index]?.name;
@@ -71,9 +77,8 @@ function CustomDrawerContent({ navigation, state }: any) {
                 navigation.closeDrawer();
                 router.push(item.caminho as any);
               }}
-              className={`flex-row items-center px-4 py-3.5 mb-1.5 rounded-xl ${
-                ativo ? 'bg-muv-roxo/10' : 'bg-transparent active:bg-gray-100'
-              }`}
+              className={`flex-row items-center px-4 py-3.5 mb-1.5 rounded-xl ${ativo ? 'bg-muv-roxo/10' : 'bg-transparent active:bg-gray-100'
+                }`}
             >
               <Ionicons name={item.icone} size={22} color={ativo ? '#8C6E97' : '#4A5568'} />
               <Text className={`ml-3.5 text-sm font-semibold ${ativo ? 'text-muv-roxo' : 'text-gray-700'}`}>
@@ -108,6 +113,7 @@ export default function AlunoLayout() {
       >
         <Drawer.Screen name="index" options={{ title: 'Minha Semana' }} />
         <Drawer.Screen name="reagendar" options={{ title: 'Reagendar' }} />
+        <Drawer.Screen name="alterar-senha" options={{ title: 'Alterar Senha' }} />
       </Drawer>
     </>
   );

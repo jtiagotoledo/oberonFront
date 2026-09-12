@@ -30,11 +30,29 @@ export default function LoginScreen() {
     try {
       const response = await api.post('/api/auth/login', {
         email: email.trim().toLowerCase(),
-        senha,
+        senha: senha.trim(), // Limpa espaços acidentais copiados do e-mail
       });
 
       const { token, usuario } = response.data;
 
+      // Se for o primeiro acesso, manda para a troca de senha ANTES de setar o estado global
+      // Isso evita que o _layout.tsx "roube" o roteamento
+      if (usuario.primeiroAcesso) {
+        login(
+          {
+            id: usuario.id,
+            name: usuario.nome,
+            email: usuario.email,
+            role: usuario.role,
+            primeiroAcesso: usuario.primeiroAcesso,
+          },
+          token
+        );
+        router.replace('/trocar-senha' as any);
+        return;
+      }
+
+      // Se não for primeiro acesso, segue o fluxo normal
       login(
         {
           id: usuario.id,
@@ -46,22 +64,19 @@ export default function LoginScreen() {
         token
       );
 
-      if (usuario.primeiroAcesso) {
-        router.replace('/trocar-senha' as any);
-        return;
-      }
+      // Usando setTimeout leve para garantir que o estado do Zustand foi processado
+      setTimeout(() => {
+        if (usuario.role === 'admin') {
+          router.replace('/(admin)');
+        } else if (usuario.role === 'professor') {
+          router.replace('/(professor)');
+        } else {
+          router.replace('/(aluno)');
+        }
+      }, 50);
 
-      if (usuario.role === 'admin') {
-        router.replace('/(admin)');
-      } else if (usuario.role === 'professor') {
-        router.replace('/(professor)');
-      } else {
-        router.replace('/(aluno)');
-      }
     } catch (error: any) {
-      console.log(error);
-      const mensagemErro =
-        error.response?.data?.erro || 'Não foi possível conectar ao servidor.';
+      const mensagemErro = error.response?.data?.erro || 'Não foi possível conectar ao servidor.';
       Alert.alert('Erro ao entrar', mensagemErro);
     } finally {
       setIsLoading(false);
@@ -122,7 +137,6 @@ export default function LoginScreen() {
             </Text>
 
             <View className="w-full">
-              {/* Campo E-mail */}
               <TextInput
                 className="w-full border border-gray-300 rounded-md px-4 py-3 mb-4 text-base text-gray-800 bg-white"
                 placeholder="E-mail"
@@ -134,7 +148,6 @@ export default function LoginScreen() {
                 onChangeText={setEmail}
               />
 
-              {/* Campo Senha */}
               <View className="w-full relative justify-center mb-8">
                 <TextInput
                   className="w-full border border-gray-300 rounded-md pl-4 pr-12 py-3 text-base text-gray-800 bg-white"
@@ -158,10 +171,10 @@ export default function LoginScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Botão Entrar */}
               <TouchableOpacity
-                className={`w-full rounded-md py-4 items-center flex-row justify-center ${isLoading ? 'bg-muv-verde/70' : 'bg-muv-verde active:opacity-80'
-                  }`}
+                className={`w-full rounded-md py-4 items-center flex-row justify-center ${
+                  isLoading ? 'bg-muv-verde/70' : 'bg-muv-verde active:opacity-80'
+                }`}
                 onPress={handleLogin}
                 disabled={isLoading}
               >
@@ -172,7 +185,6 @@ export default function LoginScreen() {
                 )}
               </TouchableOpacity>
 
-              {/* Link Esqueci Minha Senha */}
               <TouchableOpacity
                 className="mt-6 items-center"
                 onPress={() => {
@@ -189,7 +201,6 @@ export default function LoginScreen() {
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
 
-      {/* Modal de Recuperação de Senha */}
       <Modal
         visible={modalEsqueciSenha}
         transparent
@@ -218,7 +229,7 @@ export default function LoginScreen() {
 
             <View className="flex-row justify-end space-x-3">
               <TouchableOpacity
-                className="px-4 py-2.5 rounded-md bg-gray-200"
+                className="px-4 py-2.5 rounded-md bg-gray-200 mr-2"
                 onPress={() => setModalEsqueciSenha(false)}
                 disabled={loadingRecuperacao}
               >
@@ -226,8 +237,9 @@ export default function LoginScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                className={`px-5 py-2.5 rounded-md flex-row items-center justify-center ${loadingRecuperacao ? 'bg-muv-verde/70' : 'bg-muv-verde active:opacity-80'
-                  }`}
+                className={`px-5 py-2.5 rounded-md flex-row items-center justify-center ${
+                  loadingRecuperacao ? 'bg-muv-verde/70' : 'bg-muv-verde active:opacity-80'
+                }`}
                 onPress={handleSolicitarRecuperacao}
                 disabled={loadingRecuperacao}
               >

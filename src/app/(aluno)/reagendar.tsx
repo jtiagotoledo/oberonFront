@@ -21,22 +21,18 @@ export default function ReagendarScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   
-  // Listas de Dados
   const [minhasAulas, setMinhasAulas] = useState<any[]>([]);
   const [professores, setProfessores] = useState<any[]>([]);
   const [ocupacaoCompleta, setOcupacaoCompleta] = useState<any[]>([]);
   const [horariosDisponiveis, setHorariosDisponiveis] = useState<any[]>([]);
   
-  // Controles de Seleção
   const [aulaOrigem, setAulaOrigem] = useState<any>(null);
   const [professorSel, setProfessorSel] = useState<any>(null);
   
-  // Controles de Calendário
   const [mesVisualizado, setMesVisualizado] = useState<Date>(new Date());
   const [dataNova, setDataNova] = useState<Date>(new Date());
   const [horarioNovo, setHorarioNovo] = useState<any>(null);
 
-  // Modais
   const [modalAulas, setModalAulas] = useState(false);
   const [modalProfs, setModalProfs] = useState(false);
   const [modalHoras, setModalHoras] = useState(false);
@@ -80,7 +76,6 @@ export default function ReagendarScreen() {
         dataAula.setDate(domingoDaSemana.getDate() + MAPA_DIAS[hf.diaSemana]);
         dataAula.setHours(0, 0, 0, 0);
 
-        // Regra 1: Mostrar apenas aulas futuras (estritamente maior que hoje)
         if (dataAula > hoje) {
           aulasProjetadas.push({
             ...hf,
@@ -153,7 +148,6 @@ export default function ReagendarScreen() {
     try {
       setLoadingSalvar(true);
       
-      // Função auxiliar para formatar a data no padrão YYYY-MM-DD sem problema de fuso horário
       const formataYMD = (d: Date) => {
         const dataAjustada = new Date(d);
         dataAjustada.setMinutes(dataAjustada.getMinutes() - dataAjustada.getTimezoneOffset());
@@ -163,7 +157,6 @@ export default function ReagendarScreen() {
       const dataOrigemFormatada = formataYMD(aulaOrigem.dataCompleta);
       const dataNovaFormatada = formataYMD(dataNova);
 
-      // Chama a nova rota de reagendamento pontual
       await api.post(`/api/alunos/${user?.id}/reagendar`, {
         dataOrigem: dataOrigemFormatada,
         horarioOrigem: aulaOrigem.horario,
@@ -200,15 +193,17 @@ export default function ReagendarScreen() {
   const renderCalendario = () => {
     const ano = mesVisualizado.getFullYear();
     const mes = mesVisualizado.getMonth();
-    const diasNoMes = new Date(ano, mes + 1, 0).getDate();
-    const primeiroDiaIndex = new Date(ano, mes, 1).getDay();
+    
+    // Força a criação da data ao meio-dia para evitar qualquer problema de fuso horário no getDay()
+    const primeiroDiaIndex = new Date(ano, mes, 1, 12, 0, 0).getDay();
+    const diasNoMes = new Date(ano, mes + 1, 0, 12, 0, 0).getDate();
     
     const diasArray = Array(primeiroDiaIndex).fill(null).concat(Array.from({length: diasNoMes}, (_, i) => i + 1));
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
     return (
-      <View className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 w-full max-w-[340px] self-center mb-6">
+      <View className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 w-full max-w-[340px] self-center mb-6">
         <View className="flex-row justify-between items-center mb-4">
           <TouchableOpacity onPress={() => mudarMes(-1)} className="p-2">
             <Ionicons name="chevron-back" size={20} color="#718096" />
@@ -221,25 +216,30 @@ export default function ReagendarScreen() {
           </TouchableOpacity>
         </View>
         
-        <View className="flex-row justify-between mb-2 border-b border-gray-100 pb-2">
-          {DIAS_SEMANA_ABREV.map((dia) => (
-            <Text key={dia} className={`text-xs font-bold w-10 text-center ${dia === 'DOM' ? 'text-red-500' : 'text-gray-500'}`}>
-              {dia}
-            </Text>
+        {/* Cabeçalho fixo em 7 colunas */}
+        <View className="flex-row mb-2 border-b border-gray-100 pb-2">
+          {DIAS_SEMANA_ABREV.map((dia, idx) => (
+            <View key={idx} className="flex-1 items-center">
+              <Text className={`text-xs font-bold ${dia === 'DOM' ? 'text-red-500' : 'text-gray-500'}`}>
+                {dia}
+              </Text>
+            </View>
           ))}
         </View>
 
+        {/* Grid de Dias com largura percentual exata (100 / 7 = 14.28%) para alinhar perfeitamente */}
         <View className="flex-row flex-wrap">
           {diasArray.map((dia, index) => {
-            if (!dia) return <View key={index} className="w-10 h-10 m-0.5" />;
+            if (!dia) {
+              return <View key={index} style={{ width: '14.28%' }} className="h-10 my-0.5" />;
+            }
 
-            const dataAtualCalendario = new Date(ano, mes, dia);
+            const dataAtualCalendario = new Date(ano, mes, dia, 12, 0, 0);
             dataAtualCalendario.setHours(0, 0, 0, 0);
 
             const isToday = dataAtualCalendario.getTime() === hoje.getTime();
             const isSelected = dataNova && dataAtualCalendario.getTime() === dataNova.getTime();
             
-            // Regra 2: Bloquear datas passadas e menores/iguais à data de origem
             let isDisabled = false;
             if (aulaOrigem) {
               isDisabled = dataAtualCalendario <= aulaOrigem.dataCompleta;
@@ -248,32 +248,33 @@ export default function ReagendarScreen() {
             }
 
             return (
-              <TouchableOpacity
-                key={index}
-                disabled={isDisabled}
-                onPress={() => setDataNova(dataAtualCalendario)}
-                className={`w-10 h-10 m-0.5 items-center justify-center rounded-xl ${
-                  isSelected 
-                    ? 'bg-muv-roxo' 
-                    : isDisabled 
-                      ? 'bg-gray-50' 
-                      : isToday 
-                        ? 'bg-muv-amarelo/80' 
-                        : 'bg-transparent'
-                }`}
-              >
-                <Text className={`text-sm ${
-                  isDisabled 
-                    ? 'text-gray-300' 
-                    : isSelected 
-                      ? 'text-white font-bold' 
-                      : isToday 
-                        ? 'text-gray-800 font-bold' 
-                        : 'text-gray-600'
-                }`}>
-                  {dia}
-                </Text>
-              </TouchableOpacity>
+              <View key={index} style={{ width: '14.28%' }} className="items-center my-0.5">
+                <TouchableOpacity
+                  disabled={isDisabled}
+                  onPress={() => setDataNova(dataAtualCalendario)}
+                  className={`w-9 h-9 items-center justify-center rounded-xl ${
+                    isSelected 
+                      ? 'bg-muv-roxo' 
+                      : isDisabled 
+                        ? 'bg-transparent' 
+                        : isToday 
+                          ? 'bg-muv-amarelo/80' 
+                          : 'bg-transparent'
+                  }`}
+                >
+                  <Text className={`text-sm ${
+                    isDisabled 
+                      ? 'text-gray-300' 
+                      : isSelected 
+                        ? 'text-white font-bold' 
+                        : isToday 
+                          ? 'text-gray-800 font-bold' 
+                          : 'text-gray-600'
+                  }`}>
+                    {dia}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             );
           })}
         </View>
@@ -362,7 +363,6 @@ export default function ReagendarScreen() {
                   setAulaOrigem(aula); 
                   setModalAulas(false);
                   
-                  // Se a data Nova atual ficar inválida com a nova aula de origem, joga para o dia seguinte
                   if (dataNova <= aula.dataCompleta) {
                     const diaSeguinte = new Date(aula.dataCompleta);
                     diaSeguinte.setDate(diaSeguinte.getDate() + 1);

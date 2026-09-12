@@ -22,6 +22,7 @@ function NavigationGuard() {
     SplashScreen.hideAsync();
 
     const rootSegment = (segments[0] as string) || '';
+    
     const inAuthGroup =
       rootSegment === '(admin)' ||
       rootSegment === '(professor)' ||
@@ -29,16 +30,33 @@ function NavigationGuard() {
       pathname.includes('(admin)') ||
       pathname.includes('(professor)') ||
       pathname.includes('(aluno)');
+      
+    const isTrocarSenha = pathname === '/trocar-senha';
 
-    if (!token && inAuthGroup) {
+    // 1. Não tem token e tenta acessar área restrita ou troca de senha -> Login
+    if (!token && (inAuthGroup || isTrocarSenha)) {
       router.replace('/');
-    } else if (token && user && !inAuthGroup) {
-      if (user.role === 'admin') {
-        router.replace('/(admin)');
-      } else if (user.role === 'professor') {
-        router.replace('/(professor)');
+      return;
+    } 
+    
+    // 2. Tem token e usuário logado
+    if (token && user) {
+      if (user.primeiroAcesso) {
+        // Se for primeiro acesso e NÃO estiver na tela de troca, força ir pra lá
+        if (!isTrocarSenha) {
+          router.replace('/trocar-senha');
+        }
       } else {
-        router.replace('/(aluno)');
+        // Se NÃO for primeiro acesso e estiver fora dos painéis (ex: na tela de login), manda pro painel
+        if (!inAuthGroup) {
+          if (user.role === 'admin') {
+            router.replace('/(admin)');
+          } else if (user.role === 'professor') {
+            router.replace('/(professor)');
+          } else {
+            router.replace('/(aluno)');
+          }
+        }
       }
     }
   }, [token, user, hasHydrated, segments, pathname]);
