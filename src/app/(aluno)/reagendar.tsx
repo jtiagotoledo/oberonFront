@@ -22,6 +22,7 @@ export default function ReagendarScreen() {
   const [loading, setLoading] = useState(true);
   
   const [minhasAulas, setMinhasAulas] = useState<any[]>([]);
+  const [meusHorariosFixos, setMeusHorariosFixos] = useState<any[]>([]); // NOVO ESTADO
   const [professores, setProfessores] = useState<any[]>([]);
   const [ocupacaoCompleta, setOcupacaoCompleta] = useState<any[]>([]);
   const [horariosDisponiveis, setHorariosDisponiveis] = useState<any[]>([]);
@@ -48,6 +49,7 @@ export default function ReagendarScreen() {
       ]);
       
       const horariosFixos = resAluno.data.horariosAula || [];
+      setMeusHorariosFixos(horariosFixos); // SALVA A GRADE FIXA PARA CONSULTA DE CONFLITO
       gerarAulasFuturas(horariosFixos);
       
       setProfessores(resProfs.data || []);
@@ -103,7 +105,7 @@ export default function ReagendarScreen() {
     if (professorSel && dataNova) {
       filtrarHorariosPorData(dataNova, ocupacaoCompleta);
     }
-  }, [dataNova, ocupacaoCompleta, professorSel]);
+  }, [dataNova, ocupacaoCompleta, professorSel, meusHorariosFixos, aulaOrigem]);
 
   const buscarOcupacaoProfessor = async (profId: string) => {
     try {
@@ -123,7 +125,28 @@ export default function ReagendarScreen() {
     const diaEncontrado = ocupacaoGeral.find((d: any) => d.diaSemana === diaTexto);
     
     if (diaEncontrado && diaEncontrado.slots) {
-      const livres = diaEncontrado.slots.filter((s: any) => !s.lotado);
+      // 1. Pega apenas horários com vagas no professor
+      let livres = diaEncontrado.slots.filter((s: any) => !s.lotado);
+
+      // 2. Verifica as aulas fixas do próprio aluno neste dia da semana
+      const aulasNesteDia = meusHorariosFixos.filter((h: any) => h.diaSemana === diaTexto);
+      
+      if (aulasNesteDia.length > 0) {
+        // Remove das opções os horários em que o aluno já tem aula fixa
+        livres = livres.filter((slot: any) => {
+          const conflito = aulasNesteDia.find((minhaAula: any) => minhaAula.horario === slot.horario);
+          
+          if (conflito) {
+            // Libera apenas se for a própria aula que está sendo desmarcada (Origem)
+            if (aulaOrigem && aulaOrigem.diaSemana === diaTexto && aulaOrigem.horario === slot.horario) {
+              return true;
+            }
+            return false; // Bloqueia, o aluno já tem outra aula neste slot
+          }
+          return true; // Não há choque de horário
+        });
+      }
+
       setHorariosDisponiveis(livres);
     } else {
       setHorariosDisponiveis([]);
@@ -194,7 +217,6 @@ export default function ReagendarScreen() {
     const ano = mesVisualizado.getFullYear();
     const mes = mesVisualizado.getMonth();
     
-    // Força a criação da data ao meio-dia para evitar qualquer problema de fuso horário no getDay()
     const primeiroDiaIndex = new Date(ano, mes, 1, 12, 0, 0).getDay();
     const diasNoMes = new Date(ano, mes + 1, 0, 12, 0, 0).getDate();
     
@@ -216,7 +238,6 @@ export default function ReagendarScreen() {
           </TouchableOpacity>
         </View>
         
-        {/* Cabeçalho fixo em 7 colunas */}
         <View className="flex-row mb-2 border-b border-gray-100 pb-2">
           {DIAS_SEMANA_ABREV.map((dia, idx) => (
             <View key={idx} className="flex-1 items-center">
@@ -227,7 +248,6 @@ export default function ReagendarScreen() {
           ))}
         </View>
 
-        {/* Grid de Dias com largura percentual exata (100 / 7 = 14.28%) para alinhar perfeitamente */}
         <View className="flex-row flex-wrap">
           {diasArray.map((dia, index) => {
             if (!dia) {
@@ -243,7 +263,6 @@ export default function ReagendarScreen() {
             
             let isDisabled = false;
             
-            // Lógica de bloqueio: Fim de semana, ou datas anteriores/iguais à origem ou hoje
             if (isFimDeSemana) {
               isDisabled = true;
             } else if (aulaOrigem) {
