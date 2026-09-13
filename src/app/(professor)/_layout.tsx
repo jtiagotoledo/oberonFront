@@ -45,11 +45,11 @@ function CustomDrawerContent({ navigation, state }: any) {
 
   const iniciais = user?.name
     ? user.name
-        .split(' ')
-        .map((n: string) => n[0])
-        .slice(0, 2)
-        .join('')
-        .toUpperCase()
+      .split(' ')
+      .map((n: string) => n[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase()
     : 'U';
 
   return (
@@ -89,9 +89,8 @@ function CustomDrawerContent({ navigation, state }: any) {
                 navigation.closeDrawer();
                 router.push({ pathname: item.caminho as any, params: item.params });
               }}
-              className={`flex-row items-center px-4 py-3.5 mb-1.5 rounded-xl ${
-                ativo ? 'bg-green-50' : 'bg-transparent active:bg-gray-100'
-              }`}
+              className={`flex-row items-center px-4 py-3.5 mb-1.5 rounded-xl ${ativo ? 'bg-green-50' : 'bg-transparent active:bg-gray-100'
+                }`}
             >
               <Ionicons
                 name={item.icone}
@@ -99,9 +98,8 @@ function CustomDrawerContent({ navigation, state }: any) {
                 color={ativo ? '#63B887' : '#4A5568'}
               />
               <Text
-                className={`ml-3.5 text-sm font-semibold ${
-                  ativo ? 'text-muv-verde font-bold' : 'text-gray-700'
-                }`}
+                className={`ml-3.5 text-sm font-semibold ${ativo ? 'text-muv-verde font-bold' : 'text-gray-700'
+                  }`}
               >
                 {item.titulo}
               </Text>
@@ -140,15 +138,15 @@ export default function ProfessorLayout() {
           headerTitleStyle: { fontWeight: 'bold', color: '#FFFFFF' },
         }}
       >
-        <Drawer.Screen 
-          name="index" 
-          options={{ title: 'Minha Agenda' }} 
+        <Drawer.Screen
+          name="index"
+          options={{ title: 'Minha Agenda' }}
         />
-        
+
         {/* Oculta a tela de detalhes do menu lateral e adiciona botão de voltar customizado */}
-        <Drawer.Screen 
-          name="semana/[id]" 
-          options={{ 
+        <Drawer.Screen
+          name="semana/[id]"
+          options={{
             title: 'Detalhes da Semana',
             drawerItemStyle: { display: 'none' },
             headerLeft: () => (
@@ -156,10 +154,10 @@ export default function ProfessorLayout() {
                 <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
               </TouchableOpacity>
             )
-          }} 
+          }}
         />
+        <Drawer.Screen name="alterar-senha" options={{ title: 'Alterar Senha' }} />
       </Drawer>
-      <Drawer.Screen name="alterar-senha" options={{ title: 'Alterar Senha' }} />
     </>
   );
 }
