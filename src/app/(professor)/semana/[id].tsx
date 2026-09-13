@@ -3,29 +3,122 @@ import { View, Text, TouchableOpacity, ScrollView, FlatList, ActivityIndicator }
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../../services/api';
+import { useAuthStore } from '../../../store/useAuthStore';
+
+const MAPA_DIAS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
 export default function SemanaDetalhes() {
-  const { id } = useLocalSearchParams(); // Parâmetro da rota (ex: '2026-09-07')
+  const { id } = useLocalSearchParams(); 
+  const user = useAuthStore((s) => s.user);
+
   const [agenda, setAgenda] = useState<any[]>([]);
   const [diaSelecionado, setDiaSelecionado] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    carregarAgenda();
-  }, []);
+    carregarAgendaDaSemana();
+  }, [id]);
 
-  const carregarAgenda = async () => {
+  const carregarAgendaDaSemana = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/api/professores/minha-agenda');
-      const dados = res.data.agenda || [];
-      setAgenda(dados);
       
-      if (dados.length > 0) {
-        // Seleciona o primeiro dia que contém horários, ou a segunda-feira por padrão
-        const primeiroDiaComAula = dados.find((d: any) => d.horarios.length > 0) || dados[0];
-        setDiaSelecionado(primeiroDiaComAula);
+      const idStr = Array.isArray(id) ? id[0] : id;
+      if (!idStr) return;
+
+      // 1. Constrói os dias da semana selecionada (Segunda a Sexta)
+      const [ano, mes, dia] = idStr.split('-').map(Number);
+      const dataBase = new Date(ano, mes - 1, dia, 12, 0, 0); // Meio-dia para evitar bug de fuso horário
+      
+      const diasDaSemana: any[] = [];
+      
+      // Laço alterado para ir até 5 (Segunda a Sexta)
+      for (let i = 0; i < 5; i++) { 
+        const dateObj = new Date(dataBase);
+        dateObj.setDate(dataBase.getDate() + i);
+
+        const formataYMD = (d: Date) => {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          return `${y}-${m}-${dd}`;
+        };
+
+        diasDaSemana.push({
+          diaOriginal: formataYMD(dateObj),
+          diaNome: MAPA_DIAS[dateObj.getDay()],
+          dataLabel: `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}`,
+          horariosObj: {} // Objeto temporário para agrupar os alunos por hora
+        });
       }
+
+      // 2. Busca os alunos do professor
+      const res = await api.get(`/api/professores/${user?.id}/alunos`).catch(async () => {
+        const fallbackRes = await api.get('/api/alunos');
+        return { data: fallbackRes.data.filter((a: any) => a.professor?._id === user?.id || a.professor === user?.id) };
+      });
+      
+      const alunos = res.data || [];
+
+      // 3. Distribui os alunos nos dias corretos cruzando com os reagendamentos
+      alunos.forEach((aluno: any) => {
+        (aluno.horariosAula || []).forEach((aula: any) => {
+          const diaNaSemana = diasDaSemana.find(d => d.diaNome === aula.diaSemana);
+          if (diaNaSemana) {
+            const foiReagendada = (aluno.reagendamentos || []).some(
+              (r: any) => r.dataOrigem === diaNaSemana.diaOriginal && r.horarioOrigem === aula.horario
+            );
+            
+            if (!foiReagendada) {
+              if (!diaNaSemana.horariosObj[aula.horario]) diaNaSemana.horariosObj[aula.horario] = [];
+              diaNaSemana.horariosObj[aula.horario].push({
+                id: aluno._id,
+                nome: aluno.nome,
+                telefone: aluno.telefone,
+                isReagendada: false
+              });
+            }
+          }
+        });
+
+        (aluno.reagendamentos || []).forEach((reag: any) => {
+          const diaDestino = diasDaSemana.find(d => d.diaOriginal === reag.dataNova);
+          if (diaDestino) {
+            if (!diaDestino.horariosObj[reag.horarioNovo]) diaDestino.horariosObj[reag.horarioNovo] = [];
+            diaDestino.horariosObj[reag.horarioNovo].push({
+              id: `${aluno._id}-reag`,
+              nome: aluno.nome,
+              telefone: aluno.telefone,
+              isReagendada: true
+            });
+          }
+        });
+      });
+
+      // 4. Formata o objeto temporário em um array ordenado para a FlatList
+      const agendaMapeada = diasDaSemana.map(dia => {
+        const horariosArray = Object.keys(dia.horariosObj)
+          .sort() 
+          .map(hora => ({
+            id: hora,
+            hora: hora,
+            alunos: dia.horariosObj[hora]
+          }));
+
+        return {
+          ...dia,
+          horarios: horariosArray
+        };
+      });
+
+      setAgenda(agendaMapeada);
+      
+      const hojeYMD = new Date().toISOString().split('T')[0];
+      const diaDeHoje = agendaMapeada.find(d => d.diaOriginal === hojeYMD);
+      const primeiroDiaComAula = agendaMapeada.find(d => d.horarios.length > 0) || agendaMapeada[0];
+      
+      setDiaSelecionado(diaDeHoje || primeiroDiaComAula);
+
     } catch (error) {
       console.warn("Erro ao buscar agenda:", error);
     } finally {
@@ -44,7 +137,7 @@ export default function SemanaDetalhes() {
 
   return (
     <View className="flex-1 bg-gray-50">
-      {/* Badges de Dias da Semana */}
+      {/* Badges de Dias da Semana com Data */}
       <View className="bg-white pt-4 pb-3 shadow-sm z-10">
         <ScrollView 
           horizontal 
@@ -59,20 +152,24 @@ export default function SemanaDetalhes() {
               <TouchableOpacity
                 key={dia.diaOriginal}
                 onPress={() => setDiaSelecionado(dia)}
-                className={`mr-3 px-5 py-2.5 rounded-full border ${
+                className={`mr-3 px-5 py-2 rounded-2xl border ${
                   isSelected 
                     ? 'bg-muv-verde border-muv-verde' 
                     : 'bg-white border-gray-300'
                 }`}
               >
-                <View className="flex-row items-center">
-                  <Text className={`font-bold ${isSelected ? 'text-white' : 'text-gray-600'}`}>
-                    {dia.diaNome}
+                <View className="items-center justify-center">
+                  <View className="flex-row items-center">
+                    <Text className={`font-bold text-sm ${isSelected ? 'text-white' : 'text-gray-700'}`}>
+                      {dia.diaNome.split('-')[0]}
+                    </Text>
+                    {temAula && !isSelected && (
+                      <View className="w-1.5 h-1.5 rounded-full bg-muv-verde ml-1.5" />
+                    )}
+                  </View>
+                  <Text className={`text-[11px] mt-0.5 font-medium ${isSelected ? 'text-white/90' : 'text-gray-500'}`}>
+                    {dia.dataLabel}
                   </Text>
-                  {/* Bolinha indicadora se há aulas no dia (escondida se estiver selecionado) */}
-                  {temAula && !isSelected && (
-                    <View className="w-1.5 h-1.5 rounded-full bg-muv-verde ml-1.5" />
-                  )}
                 </View>
               </TouchableOpacity>
             );
@@ -111,7 +208,14 @@ export default function SemanaDetalhes() {
                     >
                       <Ionicons name="person-circle-outline" size={36} color="#CBD5E0" />
                       <View className="ml-3 flex-1">
-                        <Text className="text-gray-700 font-bold text-base">{aluno.nome}</Text>
+                        <View className="flex-row items-center">
+                          <Text className="text-gray-700 font-bold text-base">{aluno.nome}</Text>
+                          {aluno.isReagendada && (
+                            <View className="ml-2 bg-muv-teal/15 px-2 py-0.5 rounded border border-muv-teal/30">
+                              <Text className="text-[9px] font-bold text-muv-teal uppercase tracking-wider">Reagendada</Text>
+                            </View>
+                          )}
+                        </View>
                         
                         {/* Exibição do Telefone */}
                         {aluno.telefone ? (
@@ -140,8 +244,8 @@ export default function SemanaDetalhes() {
           <View className="flex-1 items-center justify-center mt-10">
             <Ionicons name="cafe-outline" size={48} color="#CBD5E0" />
             <Text className="text-gray-500 text-lg font-bold mt-4">Dia Livre!</Text>
-            <Text className="text-gray-400 text-base text-center mt-1">
-              Você não possui horários de aula configurados para {diaSelecionado?.diaNome.toLowerCase()}.
+            <Text className="text-gray-400 text-base text-center mt-1 px-4">
+              Você não possui alunos agendados para {diaSelecionado?.diaNome.toLowerCase()} ({diaSelecionado?.dataLabel}).
             </Text>
           </View>
         )}

@@ -239,9 +239,14 @@ export default function ReagendarScreen() {
 
             const isToday = dataAtualCalendario.getTime() === hoje.getTime();
             const isSelected = dataNova && dataAtualCalendario.getTime() === dataNova.getTime();
+            const isFimDeSemana = dataAtualCalendario.getDay() === 0 || dataAtualCalendario.getDay() === 6;
             
             let isDisabled = false;
-            if (aulaOrigem) {
+            
+            // Lógica de bloqueio: Fim de semana, ou datas anteriores/iguais à origem ou hoje
+            if (isFimDeSemana) {
+              isDisabled = true;
+            } else if (aulaOrigem) {
               isDisabled = dataAtualCalendario <= aulaOrigem.dataCompleta;
             } else {
               isDisabled = dataAtualCalendario <= hoje;
