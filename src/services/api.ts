@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { router } from 'expo-router';
 
 export const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL,
+  baseURL: 'https://muvup.oberonpilates.dpdns.org',
   timeout: 10000,
 });
 
