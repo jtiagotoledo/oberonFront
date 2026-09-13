@@ -33,6 +33,12 @@ function CustomDrawerContent({ navigation, state }: any) {
       caminho: '/(professor)',
       params: {},
     },
+    {
+      nome: 'alterar-senha',
+      titulo: 'Alterar Senha',
+      icone: 'key-outline' as const,
+      caminho: '/(professor)/alterar-senha',
+    },
   ];
 
   const rotaAtivaNome = state?.routes[state.index]?.name;
@@ -153,6 +159,7 @@ export default function ProfessorLayout() {
           }} 
         />
       </Drawer>
+      <Drawer.Screen name="alterar-senha" options={{ title: 'Alterar Senha' }} />
     </>
   );
 }
